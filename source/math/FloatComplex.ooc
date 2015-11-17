@@ -17,6 +17,7 @@
 
 import math
 import structs/ArrayList
+use ooc-base
 
 FloatComplex: cover {
 	real, imaginary: Float
@@ -41,11 +42,9 @@ FloatComplex: cover {
 	toString: func -> String {
 		this real toString() >> (this imaginary > 0 ? " +" : " ") & this imaginary toString() >> "i"
 	}
-	parse: static func (input: String) -> This {
-		parts := input split(' ')
+	parse: static func (input: Text) -> This {
+		parts := input find('+') >= 0 ? input split('+') : input split(' ')
 		result := This new(parts[0] toFloat(), parts[1] toFloat())
-		parts[0] free()
-		parts[1] free()
 		parts free()
 		result
 	}
@@ -53,10 +52,10 @@ FloatComplex: cover {
 		(this real) exp() * This new((this imaginary) cos(), (this imaginary) sin())
 	}
 	logarithm: func -> This {
-		This new(this absoluteValue log(), atan2(this imaginary, this real))
+		This new(this absoluteValue log(), this imaginary atan2(this real))
 	}
 	rootOfUnity: static func (n: Int, k := 1) -> This {
-		This new(0, 2 * k * PI / n) exponential()
+		This new(0.0f, 2.0f * k * Float pi / n) exponential()
 	}
 }
 operator * (left: Float, right: FloatComplex) -> FloatComplex { FloatComplex new(left * right real, left * right imaginary) }

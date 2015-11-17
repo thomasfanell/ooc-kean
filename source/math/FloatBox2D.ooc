@@ -19,6 +19,7 @@ import FloatSize2D
 import IntBox2D
 import FloatPoint2DVectorList
 import structs/ArrayList
+use ooc-base
 use ooc-collections
 
 FloatBox2D: cover {
@@ -57,14 +58,14 @@ FloatBox2D: cover {
 	}
 	pad: func ~fromFloat (pad: Float) -> This { this pad(pad, pad, pad, pad) }
 	pad: func ~fromSize (pad: FloatSize2D) -> This { this pad(pad width, pad width, pad height, pad height) }
-	pad: func ~fraction (pad: Float) -> This {
-		this pad(pad * this size / 2.0f)
+	enlargeEvenly: func (fraction: Float) -> This {
+		this pad(fraction * (this size width + this size height) / 2.0f)
 	}
-	padFractionAverage: func (pad: Float) -> This {
-		this pad(pad * (this size width + this size height) / 2.0f)
+	enlarge: func (fraction: Float) -> This {
+		this scale(1.0f + fraction)
 	}
-	shrink: func ~fraction (margin: Float) -> This {
-		this pad(-margin * this height / 2.0f)
+	shrink: func (fraction: Float) -> This {
+		this scale(1.0f - fraction)
 	}
 	resizeTo: func (size: FloatSize2D) -> This {
 		This createAround(this center, size)
@@ -110,6 +111,15 @@ FloatBox2D: cover {
 				result add(i)
 		result
 	}
+	distance: func (point: FloatPoint2D) -> FloatSize2D {
+		((point - this center) toFloatSize2D() absolute - this size / 2.f) maximum(FloatSize2D new())
+	}
+	maximumDistance: func (points: VectorList<FloatPoint2D>) -> FloatSize2D {
+		result := FloatSize2D new()
+		for (index in 0 .. points count)
+			result = FloatSize2D maximum(this distance(points[index]), result)
+		result
+	}
 	round: func -> This { This new(this leftTop round(), this size round()) }
 	ceiling: func -> This { This new(this leftTop ceiling(), this size ceiling()) }
 	floor: func -> This { This new(this leftTop floor(), this size floor()) }
@@ -143,9 +153,11 @@ FloatBox2D: cover {
 		this createAround(newCenter, newSize)
 	}
 	toString: func -> String { "#{this leftTop toString()}, #{this size toString()}" }
-	parse: static func (input: String) -> This {
-		array := input split(',')
-		This new(array[0] toFloat(), array[1] toFloat(), array[2] toFloat(), array[3] toFloat())
+	parse: static func (input: Text) -> This {
+		parts := input split(',')
+		result := This new(parts[0] toFloat(), parts[1] toFloat(), parts[2] toFloat(), parts[3] toFloat())
+		parts free()
+		result
 	}
 	create: static func (leftTop: FloatPoint2D, size: FloatSize2D) -> This { This new(leftTop, size) }
 	create: static func ~fromFloats (left, top, width, height: Float) -> This { This new(left, top, width, height) }
@@ -177,5 +189,8 @@ FloatBox2D: cover {
 			}
 		}
 		This new(xMinimum, yMinimum, xMaximum - xMinimum, yMaximum - yMinimum)
+	}
+	linearInterpolation: static func (a, b: This, ratio: Float) -> This {
+		This new(FloatPoint2D linearInterpolation(a leftTop, b leftTop, ratio), FloatSize2D linearInterpolation(a size, b size, ratio))
 	}
 }

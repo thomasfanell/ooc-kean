@@ -17,6 +17,7 @@ import math
 import FloatPoint2D
 import IntSize2D
 import structs/ArrayList
+use ooc-base
 
 FloatSize2D: cover {
 	width, height: Float
@@ -25,6 +26,7 @@ FloatSize2D: cover {
 	empty ::= !(this width > 0 && this height > 0)
 	norm ::= (this width squared() + this height squared()) sqrt()
 	azimuth ::= this height atan2(this width)
+	absolute ::= This new(Float absolute(this width), Float absolute(this height))
 	basisX: static This { get { This new(1, 0) } }
 	basisY: static This { get { This new(0, 1) } }
 	init: func@ (=width, =height)
@@ -73,9 +75,11 @@ FloatSize2D: cover {
 	toFloatPoint2D: func -> FloatPoint2D { FloatPoint2D new(this width, this height) }
 	operator as -> String { this toString() }
 	toString: func -> String { "#{this width toString()}, #{this height toString()}" }
-	parse: static func (input: String) -> This {
-		array := input split(',')
-		This new (array[0] toFloat(), array[1] toFloat())
+	parse: static func (input: Text) -> This {
+		parts := input split(',')
+		result := This new (parts[0] toFloat(), parts[1] toFloat())
+		parts free()
+		result
 	}
 	linearInterpolation: static func (a, b: This, ratio: Float) -> This {
 		This new(Float linearInterpolation(a width, b width, ratio), Float linearInterpolation(a height, b height, ratio))

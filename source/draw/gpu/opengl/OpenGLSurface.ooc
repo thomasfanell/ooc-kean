@@ -19,7 +19,7 @@ use ooc-collections
 use ooc-math
 use ooc-draw
 use ooc-draw-gpu
-import OpenGLContext
+import OpenGLContext, OpenGLPacked
 import backend/GLRenderer
 
 version(!gpuOff) {
@@ -52,7 +52,6 @@ OpenGLSurface: abstract class extends GpuSurface {
 		(f as Closure) dispose()
 	}
 	draw: override func ~GpuImage (image: GpuImage, source: IntBox2D, destination: IntBox2D, map: GpuMap) {
-		image bind(0)
 		map textureTransform = This _createTextureTransform(image size, source)
 		this draw(destination, map)
 	}
@@ -62,13 +61,13 @@ OpenGLSurface: abstract class extends GpuSurface {
 		(f as Closure) dispose()
 	}
 	drawPoints: override func (pointList: VectorList<FloatPoint2D>) {
-		f := func { this context drawPoints(pointList, this _projection * this _toLocal) }
+		f := func { this context drawPoints(pointList, this _projection * this _toLocal, this pen) }
 		this draw(f)
 		(f as Closure) dispose()
 	}
-	draw: override func ~mesh (image: Image, mesh: GpuMesh) {
+	draw: override func ~mesh (image: GpuImage, mesh: GpuMesh) {
 		f := func {
-			(image as GpuImage) bind(0)
+			this context meshShader add("texture0", image)
 			this context meshShader projection = this _projection
 			this context meshShader use()
 			mesh draw()

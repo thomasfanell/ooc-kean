@@ -1,4 +1,4 @@
-
+import lang/equalities
 import ArrayList
 
 /**
@@ -7,44 +7,23 @@ import ArrayList
 HashEntry: cover {
 
     key, value: Pointer
-    next: HashEntry*
+    next: HashEntry* = null
 
-    init: func@ ~keyVal (=key, =value) {
-        next = null
+    init: func@ ~keyVal (=key, =value)
+    free: func {
+      free(this key)
+      free(this value)
+      if (this next != null) {
+        temp := this next@
+        temp free()
+        free(this next)
+      }
     }
 
 }
 
 nullHashEntry: HashEntry
 memset(nullHashEntry&, 0, HashEntry size)
-
-stringEquals: func <K> (k1, k2: K) -> Bool {
-    assert(K == String)
-    k1 as String equals?(k2 as String)
-}
-
-cstringEquals: func <K> (k1, k2: K) -> Bool {
-    k1 as CString == k2 as CString
-}
-
-
-pointerEquals: func <K> (k1, k2: K) -> Bool {
-    k1 as Pointer == k2 as Pointer
-}
-
-intEquals: func <K> (k1, k2: K) -> Bool {
-    k1 as Int == k2 as Int
-}
-
-charEquals: func <K> (k1, k2: K) -> Bool {
-    k1 as Char == k2 as Char
-}
-
-/** used when we don't have a custom comparing function for the key type */
-genericEquals: func <K> (k1, k2: K) -> Bool {
-    // FIXME rock should turn == between generic vars into a memcmp itself
-    memcmp(k1, k2, K size) == 0
-}
 
 intHash: func <K> (key: K) -> SizeT {
     result: SizeT = key as Int
@@ -133,24 +112,6 @@ ac_X31_hash: func <K> (key: K) -> SizeT {
     return h
 }
 
-/* this function seem is called by List */
-getStandardEquals: func <T> (T: Class) -> Func <T> (T, T) -> Bool {
-    // choose comparing function for key type
-    if(T == String) {
-        stringEquals
-    } else if(T == CString) {
-        cstringEquals
-    } else if(T size == Pointer size) {
-        pointerEquals
-    } else if(T size == UInt size) {
-        intEquals
-    } else if(T size == Char size) {
-        charEquals
-    } else {
-        genericEquals
-    }
-}
-
 getStandardHashFunc: func <T> (T: Class) -> Func <T> (T) -> SizeT {
     if(T == String || T == CString) {
         ac_X31_hash
@@ -206,6 +167,14 @@ HashMap: class <K, V> extends BackIterable<V> {
         hashKey = getStandardHashFunc(K)
 
         T = V // workarounds ftw
+    }
+
+    free: override func {
+      for (i in 0 .. this buckets length)
+        this buckets[i] free()
+      this buckets free()
+      this keys free()
+      super()
     }
 
     /**
@@ -385,11 +354,13 @@ HashMap: class <K, V> extends BackIterable<V> {
 
         prev = null : HashEntry*
         entry: HashEntry* = (buckets data as HashEntry*)[hash]&
-
-        if(entry@ key == null) return false
+        if (entry@ key == null) return false
 
         while (true) {
             if (keyEquals(entry@ key as K, key)) {
+              free(entry@ key)
+              free(entry@ value)
+
                 if(prev) {
                     // re-connect the previous to the next one
                     prev@ next = entry@ next
@@ -421,7 +392,6 @@ HashMap: class <K, V> extends BackIterable<V> {
                 return false
             }
         }
-
         return false
     }
 

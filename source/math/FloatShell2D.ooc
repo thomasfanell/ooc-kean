@@ -18,6 +18,7 @@ import FloatPoint2D
 import FloatSize2D
 import FloatBox2D
 import structs/ArrayList
+use ooc-base
 
 FloatShell2D: cover {
 	left, right, top, bottom: Float
@@ -51,8 +52,10 @@ FloatShell2D: cover {
 	operator != (other: This) -> Bool { !(this == other) }
 	operator as -> String { this toString() }
 	toString: func -> String { "#{this left toString()}, #{this right toString()}, #{this top toString()}, #{this bottom toString()}" }
-	parse: static func (input: String) -> This {
-		array := input split(',')
-		This new(array[0] toFloat(), array[1] toFloat(), array[2] toFloat(), array[3] toFloat())
+	parse: static func (input: Text) -> This {
+		parts := input split(',')
+		result := This new(parts[0] toFloat(), parts[1] toFloat(), parts[2] toFloat(), parts[3] toFloat())
+		parts free()
+		result
 	}
 }

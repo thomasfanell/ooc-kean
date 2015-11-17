@@ -20,14 +20,24 @@ use ooc-math
 use ooc-draw
 use ooc-draw-gpu
 import backend/GLShaderProgram
-import OpenGLContext
+import OpenGLContext, OpenGLPacked, OpenGLVolumeMonochrome
 
 version(!gpuOff) {
 OpenGLMap: abstract class extends GpuMap {
 	_vertexSource: String
 	_fragmentSource: String
 	_program: GLShaderProgram[]
-	program: GLShaderProgram { get { this _program[this _context getCurrentIndex()] } }
+	_currentProgram: GLShaderProgram {
+		get {
+			index := this _context getCurrentIndex()
+			result := this _program[index]
+			if (result == null) {
+				result = this _context _backend createShaderProgram(this _vertexSource, this _fragmentSource)
+				this _program[index] = result
+			}
+			result
+		}
+	}
 	_context: OpenGLContext
 	init: func (vertexSource: String, fragmentSource: String, context: OpenGLContext) {
 		super()
@@ -47,17 +57,58 @@ OpenGLMap: abstract class extends GpuMap {
 		super()
 	}
 	use: override func {
-		currentIndex := this _context getCurrentIndex()
-		if (this _program[currentIndex] == null)
-			this _program[currentIndex] = this _context as OpenGLContext _backend createShaderProgram(this _vertexSource, this _fragmentSource)
-		this _program[currentIndex] use()
+		this _currentProgram use()
+		textureCount := 0
+		action := func (key: String, value: Object) {
+			program := this _currentProgram
+			if (value instanceOf?(Cell)) {
+				cell := value as Cell
+				match (cell T) {
+					case Int => program setUniform(key, cell as Cell<Int> get())
+					case IntPoint2D => program setUniform(key, cell as Cell<IntPoint2D> get())
+					case IntPoint3D => program setUniform(key, cell as Cell<IntPoint3D> get())
+					case IntSize2D => program setUniform(key, cell as Cell<IntSize2D> get())
+					case IntSize3D => program setUniform(key, cell as Cell<IntSize3D> get())
+					case Float => program setUniform(key, cell as Cell<Float> get())
+					case FloatPoint2D => program setUniform(key, cell as Cell<FloatPoint2D> get())
+					case FloatPoint3D => program setUniform(key, cell as Cell<FloatPoint3D> get())
+					case FloatPoint4D => program setUniform(key, cell as Cell<FloatPoint4D> get())
+					case FloatSize2D => program setUniform(key, cell as Cell<FloatSize2D> get())
+					case FloatSize3D => program setUniform(key, cell as Cell<FloatSize3D> get())
+					case FloatTransform2D => program setUniform(key, cell as Cell<FloatTransform2D> get())
+					case FloatTransform3D => program setUniform(key, cell as Cell<FloatTransform3D> get())
+					case ColorBgr => program setUniform(key, cell as Cell<ColorBgr> get())
+					case ColorBgra => program setUniform(key, cell as Cell<ColorBgra> get())
+					case ColorUv => program setUniform(key, cell as Cell<ColorUv> get())
+					case ColorYuv => program setUniform(key, cell as Cell<ColorYuv> get())
+					case ColorYuva => program setUniform(key, cell as Cell<ColorYuva> get())
+					case => Debug raise("Invalid cover type in OpenGLMap use!")
+				}
+			}
+			else
+				match (value) {
+					case image: OpenGLPacked => {
+						image backend bind(textureCount)
+						program setUniform(key, textureCount)
+						textureCount += 1
+					}
+					case image: OpenGLVolumeMonochrome => {
+						image _backend bind(textureCount)
+						program setUniform(key, textureCount)
+						textureCount += 1
+					}
+					case => Debug raise("Invalid object type in OpenGLMap use: %s" format(value class name))
+				}
+		}
+		this apply(action)
+		(action as Closure) dispose()
 	}
 }
 OpenGLMapMesh: class extends OpenGLMap {
 	init: func (context: OpenGLContext) { super(This vertexSource, This fragmentSource, context) }
 	use: override func {
+		this add("projection", this projection)
 		super()
-		this program setUniform("projection", this projection)
 	}
 	vertexSource: static String = "#version 300 es
 		precision highp float;
@@ -98,10 +149,6 @@ OpenGLMapDefault: abstract class extends OpenGLMap {
 OpenGLMapDefaultTexture: class extends OpenGLMapDefault {
 	init: func (context: OpenGLContext, fragmentSource: String)
 	init: func ~default (context: OpenGLContext) { this init(This fragmentSource, context) }
-	use: override func {
-		super()
-		this program setUniform("texture0", 0)
-	}
 	fragmentSource: static String = "#version 300 es
 		precision highp float;
 		uniform sampler2D texture0;
@@ -115,10 +162,10 @@ OpenGLMapDefaultTexture: class extends OpenGLMapDefault {
 OpenGLMapTransform: abstract class extends OpenGLMap {
 	init: func (fragmentSource: String, context: OpenGLContext) { super(This vertexSource, fragmentSource, context) }
 	use: override func {
-		super()
 		finalTransform := this projection * this view * this model
-		this program setUniform("transform", finalTransform)
-		this program setUniform("textureTransform", this textureTransform)
+		this add("transform", finalTransform)
+		this add("textureTransform", this textureTransform)
+		super()
 	}
 	vertexSource: static String = "#version 300 es
 		precision highp float;
@@ -163,12 +210,6 @@ OpenGLMapMonochromeToBgra: class extends OpenGLMapDefaultTexture {
 }
 OpenGLMapYuvPlanarToBgra: class extends OpenGLMapTransform {
 	init: func (context: OpenGLContext) { super(This fragmentSource, context) }
-	use: override func {
-		super()
-		this program setUniform("texture0", 0)
-		this program setUniform("texture1", 1)
-		this program setUniform("texture2", 2)
-	}
 	fragmentSource: static String = "#version 300 es
 		precision highp float;
 		uniform sampler2D texture0;
@@ -194,11 +235,6 @@ OpenGLMapYuvPlanarToBgra: class extends OpenGLMapTransform {
 }
 OpenGLMapYuvSemiplanarToBgra: class extends OpenGLMapTransform {
 	init: func (context: OpenGLContext) { super(This fragmentSource, context) }
-	use: override func {
-		super()
-		this program setUniform("texture0", 0)
-		this program setUniform("texture1", 1)
-	}
 	fragmentSource: static String = "#version 300 es
 		precision highp float;
 		uniform sampler2D texture0;
@@ -221,12 +257,7 @@ OpenGLMapYuvSemiplanarToBgra: class extends OpenGLMapTransform {
 		"
 }
 OpenGLMapLines: class extends OpenGLMapTransform {
-	color: FloatPoint4D { get set }
 	init: func (context: OpenGLContext) { super(This fragmentSource, context) }
-	use: override func {
-		super()
-		this program setUniform("color", this color)
-	}
 	fragmentSource: static String = "#version 300 es
 		precision highp float;
 		uniform vec4 color;
@@ -237,19 +268,7 @@ OpenGLMapLines: class extends OpenGLMapTransform {
 		"
 }
 OpenGLMapPoints: class extends OpenGLMap {
-	color: FloatPoint4D { get set }
-	pointSize: Float { get set }
-	projection: FloatTransform3D { get set }
-	init: func (context: OpenGLContext) {
-		this pointSize = 1.0f
-		super(This vertexSource, This fragmentSource, context)
-	}
-	use: override func {
-		super()
-		this program setUniform("color", this color)
-		this program setUniform("pointSize", this pointSize)
-		this program setUniform("transform", this projection)
-	}
+	init: func (context: OpenGLContext) { super(This vertexSource, This fragmentSource, context) }
 	vertexSource: static String = "#version 300 es
 		precision highp float;
 		uniform float pointSize;

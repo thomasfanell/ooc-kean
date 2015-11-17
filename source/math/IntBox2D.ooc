@@ -19,6 +19,7 @@ import IntSize2D
 import FloatPoint2D
 import FloatBox2D
 import structs/ArrayList
+use ooc-base
 use ooc-math
 
 IntBox2D: cover {
@@ -84,6 +85,9 @@ IntBox2D: cover {
 		height := Int maximum~two(0, Int maximum(this bottom, other bottom) - top)
 		This new(left, top, width, height)
 	}
+	union: func ~point (point: IntPoint2D) -> This {
+		This new(this leftTop minimum(point), this rightBottom maximum(point))
+	}
 	contains: func (point: IntPoint2D) -> Bool {
 		this left <= point x && point x < this right && this top <= point y && point y < this bottom
 	}
@@ -114,9 +118,11 @@ IntBox2D: cover {
 	toFloatBox2D: func -> FloatBox2D { FloatBox2D new(this left, this top, this width, this height) }
 	operator as -> String { this toString() }
 	toString: func -> String { "#{this leftTop toString()}, #{this size toString()}" }
-	parse: static func (input: String) -> This {
-		array := input split(',')
-		This new(array[0] toInt(), array[1] toInt(), array[2] toInt(), array[3] toInt())
+	parse: static func (input: Text) -> This {
+		parts := input split(',')
+		result := This new(parts[0] toInt(), parts[1] toInt(), parts[2] toInt(), parts[3] toInt())
+		parts free()
+		result
 	}
 	create: static func (leftTop: IntPoint2D, size: IntSize2D) -> This { This new(leftTop, size) }
 	create: static func ~fromFloats (left, top, width, height: Int) -> This { This new(left, top, width, height) }
