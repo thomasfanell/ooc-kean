@@ -15,7 +15,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 import math
 import FloatSize2D
-import structs/ArrayList
 import IntPoint2D
 use ooc-base
 
@@ -26,15 +25,17 @@ FloatPoint2D: cover {
 	init: func@ (=x, =y)
 	init: func@ ~default { this init(0.0f, 0.0f) }
 	pNorm: func (p: Float) -> Float {
-		p == 1 ?
-			this x abs() + this y abs() :
-			(this x abs() pow(p) + this y abs() pow(p)) pow(1.0f / p)
+		(this x abs() pow(p) + this y abs() pow(p)) pow(1.0f / p)
 	}
 	scalarProduct: func (other: This) -> Float { this x * other x + this y * other y }
 	angle: func (other: This) -> Float {
 		(this scalarProduct(other) / (this norm * other norm)) clamp(-1, 1) acos() * (this x * other y - this y * other x < 0 ? -1 : 1)
 	}
 	distance: func (other: This) -> Float { (this - other) norm }
+	distanceSquared: func (other: This) -> Float {
+		distanceVector := this - other
+		distanceVector x * distanceVector x + distanceVector y * distanceVector y
+	}
 	swap: func -> This { This new(this y, this x) }
 	round: func -> This { This new(this x round(), this y round()) }
 	ceiling: func -> This { This new(this x ceil(), this y ceil()) }

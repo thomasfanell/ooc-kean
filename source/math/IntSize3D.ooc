@@ -13,10 +13,10 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 import math
 import IntPoint3D
 import FloatSize3D
-import structs/ArrayList
 use ooc-base
 
 IntSize3D: cover {
@@ -29,10 +29,9 @@ IntSize3D: cover {
 	init: func@ (=width, =height, =depth)
 	init: func@ ~default { this init(0, 0, 0) }
 	scalarProduct: func (other: This) -> Int { this width * other width + this height * other height + this depth * other depth }
-	minimum: func (ceiling: This) -> This { This new(Int minimum~two(this width, ceiling width), Int minimum~two(this height, ceiling height), Int minimum~two(this depth, ceiling depth)) }
-	maximum: func (floor: This) -> This { This new(Int maximum~two(this width, floor width), Int maximum~two(this height, floor height), Int maximum~two(this depth, floor depth)) }
+	minimum: func (ceiling: This) -> This { This new(Int minimum(this width, ceiling width), Int minimum(this height, ceiling height), Int minimum(this depth, ceiling depth)) }
+	maximum: func (floor: This) -> This { This new(Int maximum(this width, floor width), Int maximum(this height, floor height), Int maximum(this depth, floor depth)) }
 	clamp: func (floor, ceiling: This) -> This { This new(this width clamp(floor width, ceiling width), this height clamp(floor height, ceiling height), this depth clamp(floor depth, ceiling depth)) }
-	fillEven: static func (other: This) -> This { This new(other width + (other width % 2 == 1 ? 1 : 0), other height + (other height % 2 == 1 ? 1 : 0), other depth + (other depth % 2 == 1 ? 1 : 0)) }
 	operator + (other: This) -> This { This new(this width + other width, this height + other height, this depth + other depth) }
 	operator + (other: IntPoint3D) -> This { This new(this width + other x, this height + other y, this depth + other z) }
 	operator - (other: This) -> This { This new(this width - other width, this height - other height, this depth - other depth) }

@@ -18,7 +18,6 @@ import FloatPoint2D
 import FloatSize2D
 import IntBox2D
 import FloatPoint2DVectorList
-import structs/ArrayList
 use ooc-base
 use ooc-collections
 
@@ -34,7 +33,7 @@ FloatBox2D: cover {
 	rightTop ::= FloatPoint2D new(this right, this top)
 	leftBottom ::= FloatPoint2D new(this left, this bottom)
 	rightBottom ::= this leftTop + this size
-	center ::= this leftTop + (this size / 2)
+	center ::= this leftTop + this size / 2.0f
 	leftCenter ::= FloatPoint2D new(this left, this center y)
 	rightCenter ::= FloatPoint2D new(this right, this center y)
 	topCenter ::= FloatPoint2D new(this center x, this top)
@@ -87,18 +86,10 @@ FloatBox2D: cover {
 		This new(left, top, width, height)
 	}
 	union: func ~box (other: This) -> This { // Rock bug: Union without suffix cannot be used because the C name conflicts with keyword "union"
-		left := Float minimum(this left, other left)
-		top := Float minimum(this top, other top)
-		width := Float maximum(0, (Float maximum(this right, other right) - left))
-		height := Float maximum(0, (Float maximum(this bottom, other bottom) - top))
-		This new(left, top, width, height)
+		This new(this leftTop minimum(other leftTop), this rightBottom maximum(other rightBottom))
 	}
 	union: func ~point (point: FloatPoint2D) -> This {
-		left := Float minimum(this left, point x)
-		top := Float minimum(this top, point y)
-		width := Float maximum(0, Float maximum(this right, point x) - left)
-		height := Float maximum(0, Float maximum(this bottom, point y) - top)
-		This new(left, top, width, height)
+		This new(this leftTop minimum(point), this rightBottom maximum(point))
 	}
 	contains: func (point: FloatPoint2D) -> Bool {
 		this left <= point x && point x <= this right && this top <= point y && point y <= this bottom
@@ -150,7 +141,7 @@ FloatBox2D: cover {
 	adaptTo: func (other: This, weight: Float) -> This {
 		newCenter := FloatPoint2D linearInterpolation(this center, other center, weight)
 		newSize := FloatSize2D linearInterpolation(this size, other size, weight)
-		this createAround(newCenter, newSize)
+		This createAround(newCenter, newSize)
 	}
 	toString: func -> String { "#{this leftTop toString()}, #{this size toString()}" }
 	parse: static func (input: Text) -> This {
@@ -159,18 +150,18 @@ FloatBox2D: cover {
 		parts free()
 		result
 	}
-	create: static func (leftTop: FloatPoint2D, size: FloatSize2D) -> This { This new(leftTop, size) }
-	create: static func ~fromFloats (left, top, width, height: Float) -> This { This new(left, top, width, height) }
-	createAround: static func (center: FloatPoint2D, size: FloatSize2D) -> This { This new(center + (-size) / 2, size) }
+	createAround: static func (center: FloatPoint2D, size: FloatSize2D) -> This { This new(center - size / 2.0f, size) }
 	bounds: static func (left, right, top, bottom: Float) -> This { This new(left, top, right - left, bottom - top) }
-	bounds: static func ~fromArray (points: FloatPoint2D[]) -> This { This bounds(points as ArrayList<FloatPoint2D>) }
-	bounds: static func ~fromList (points: ArrayList<FloatPoint2D>) -> This {
+	bounds: static func ~fromArray (points: FloatPoint2D[]) -> This { This bounds(points data, points length) }
+	bounds: static func ~fromList (points: VectorList<FloatPoint2D>) -> This { This bounds(points pointer as FloatPoint2D*, points count) }
+	bounds: static func ~fromPointer (data: FloatPoint2D*, count: Int) -> This {
 		xMinimum := 0.0f
 		xMaximum := xMinimum
 		yMinimum := xMinimum
 		yMaximum := xMinimum
 		initialized := false
-		for (point in points) {
+		for (i in 0 .. count) {
+			point := data[i]
 			if (!initialized) {
 				initialized = true
 				xMinimum = point x

@@ -18,15 +18,15 @@ use ooc-collections
 use ooc-draw
 use ooc-math
 use ooc-base
-import OpenGLContext, GraphicBuffer, GraphicBufferYuv420Semiplanar, EGLBgra, OpenGLBgra, OpenGLPacked, OpenGLMonochrome, OpenGLUv
-import Map/OpenGLMapPack
+import OpenGLContext, GraphicBuffer, GraphicBufferYuv420Semiplanar, EGLBgra, OpenGLBgra, OpenGLPacked, OpenGLMonochrome, OpenGLUv, OpenGLMap
 import threading/Thread
 import math
 
 version(!gpuOff) {
 AndroidContext: class extends OpenGLContext {
-	_unpackRgbaToMonochrome := OpenGLMapUnpackRgbaToMonochrome new(this)
-	_unpackRgbaToUv := OpenGLMapUnpackRgbaToUv new(this)
+	_unpackRgbaToMonochrome := OpenGLMap new(slurp("shaders/unpack.vert"), slurp("shaders/unpackRgbaToMonochrome.frag"), this)
+	_unpackRgbaToUv := OpenGLMap new(slurp("shaders/unpack.vert"), slurp("shaders/unpackRgbaToUv.frag"), this)
+	_unpackRgbaToUvPadded := OpenGLMap new(slurp("shaders/unpack.vert"), slurp("shaders/unpackRgbaToUvPadded.frag"), this)
 	_packers := VectorList<EGLBgra> new()
 	init: func { super() }
 	init: func ~other (other: This) { super(other) }
@@ -34,6 +34,7 @@ AndroidContext: class extends OpenGLContext {
 		this _backend makeCurrent()
 		this _unpackRgbaToMonochrome free()
 		this _unpackRgbaToUv free()
+		this _unpackRgbaToUvPadded free()
 		this _packers free()
 		super()
 	}
@@ -43,7 +44,7 @@ AndroidContext: class extends OpenGLContext {
 			if (rasterImage instanceOf?(GraphicBufferYuv420Semiplanar)) {
 				graphicBufferImage := rasterImage as GraphicBufferYuv420Semiplanar
 				rgba := graphicBufferImage toRgba(this)
-				result = this unpackBgraToYuv420Semiplanar(rgba, rasterImage size)
+				result = this unpackBgraToYuv420Semiplanar(rgba, rasterImage size, graphicBufferImage uvPadding % graphicBufferImage stride)
 				rgba free()
 			}
 			else
@@ -74,15 +75,14 @@ AndroidContext: class extends OpenGLContext {
 		fence := this createFence()
 		fence sync()
 		eglImage := gpuRgba as EGLBgra
-		sourcePointer := eglImage buffer lock(false)
+		sourcePointer := eglImage buffer lock(false) as UInt8*
 		length := channels * eglImage size width * eglImage size height
-		buffer := ByteBuffer new(sourcePointer, length,
-			func (b: ByteBuffer) {
-				eglImage buffer unlock()
-				this recyclePacker(gpuRgba)
-				b forceFree()
-			})
-		(buffer, fence)
+		recover := func (b: ByteBuffer) -> Bool {
+			eglImage buffer unlock()
+			this recyclePacker(gpuRgba)
+			false
+		}
+		(ByteBuffer new(sourcePointer, length, recover), fence)
 	}
 	toRaster: func ~monochrome (gpuImage: OpenGLMonochrome, async: Bool) -> RasterImage {
 		(buffer, fence) := this toBuffer(gpuImage, this _packMonochrome)
@@ -136,14 +136,21 @@ AndroidContext: class extends OpenGLContext {
 		map add("startY", startY)
 		target canvas draw(source, map)
 	}
-	unpackBgraToYuv420Semiplanar: func (source: GpuImage, targetSize: IntSize2D) -> GpuYuv420Semiplanar {
+	unpackBgraToYuv420Semiplanar: func (source: GpuImage, targetSize: IntSize2D, padding := 0) -> GpuYuv420Semiplanar {
 		target := this createYuv420Semiplanar(targetSize) as GpuYuv420Semiplanar
 		sourceSize := source size
 		transform := FloatTransform3D createScaling(source transform a, -source transform e, 1.0f)
-		This _unpack(source, target y, this _unpackRgbaToMonochrome, targetSize width, transform, targetSize width as Float / (4 * sourceSize width), targetSize height as Float / sourceSize height, 0.0f)
+		yMap: GpuMap = this _unpackRgbaToMonochrome
+		uvMap: GpuMap = this _unpackRgbaToUv
+		if (padding > 0) {
+			uvMap = this _unpackRgbaToUvPadded
+			uvMap add("paddingOffset", padding as Float / (source size width * 4) as Float)
+			uvMap add("rowUnit", 1.0f / sourceSize height)
+		}
+		This _unpack(source, target y, yMap, targetSize width, transform, targetSize width as Float / (4 * sourceSize width), targetSize height as Float / sourceSize height, 0.0f)
 		uvSize := target uv size
 		startY := (sourceSize height - uvSize height) as Float / sourceSize height
-		This _unpack(source, target uv, this _unpackRgbaToUv, uvSize width, transform, (uvSize width as Float) / (2 * sourceSize width), 1.0f - startY, startY)
+		This _unpack(source, target uv, uvMap, uvSize width, transform, (uvSize width as Float) / (2 * sourceSize width), 1.0f - startY, startY)
 		target
 	}
 	alignWidth: override func (width: Int, align := AlignWidth Nearest) -> Int { GraphicBuffer alignWidth(width, align) }

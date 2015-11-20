@@ -49,25 +49,11 @@ Text: cover {
 	}
 	copyTo: func (buffer: TextBuffer) -> Int { this _buffer copyTo(buffer) }
 	operator == (string: String) -> Bool { this == This new(string) }
-	operator == (other: This) -> Bool {
-		result := this _buffer == other _buffer
-		if (this _buffer raw != other _buffer raw)
-			other free(Owner Receiver)
-		this free(Owner Receiver)
-		result
-	}
+	operator == (other: This) -> Bool { this _buffer == other _buffer }
 	operator != (other: String) -> Bool { !(this == other) }
 	operator != (other: This) -> Bool { !(this == other) }
-	operator + (other: This) -> This {
-		result := TextBuffer new(this take() count + other take() count)
-		this _buffer copyTo(result)
-		other _buffer copyTo(result slice(this take() count))
-		if (this _buffer raw != other _buffer raw)
-			other free(Owner Receiver)
-		this free(Owner Receiver)
-		This new(result)
-	}
-	beginsWith: func (other: This) -> Bool { this slice(0, Int minimum~two(other count, this count)) == other }
+	operator + (other: This) -> This { This new(this _buffer + other _buffer) }
+	beginsWith: func (other: This) -> Bool { this slice(0, Int minimum(other count, this count)) == other }
 	beginsWith: func ~string (other: String) -> Bool { this beginsWith(This new(other)) }
 	beginsWith: func ~character (character: Char) -> Bool {
 		result := (this count > 0) && (this _buffer[0] == character)
@@ -75,7 +61,7 @@ Text: cover {
 		result
 	}
 	endsWith: func (other: This) -> Bool {
-		this slice(Int maximum~two(0, this count - other count), Int minimum~two(other count, this count)) == other
+		this slice(Int maximum(0, this count - other count), Int minimum(other count, this count)) == other
 	}
 	endsWith: func ~string (other: String) -> Bool { this endsWith(This new(other)) }
 	endsWith: func ~character (character: Char) -> Bool {

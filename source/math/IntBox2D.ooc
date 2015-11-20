@@ -13,13 +13,14 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 import math
 import IntPoint2D
 import IntSize2D
 import FloatPoint2D
 import FloatBox2D
-import structs/ArrayList
 use ooc-base
+use ooc-collections
 use ooc-math
 
 IntBox2D: cover {
@@ -46,8 +47,8 @@ IntBox2D: cover {
 	init: func@ ~fromInts (left, top, width, height: Int) { this init(IntPoint2D new(left, top), IntSize2D new(width, height)) }
 	//init: func@ ~fromSize (size: IntSize2D) { this init(IntPoint2D new(), size) }
 	init: func@ ~fromPoints (first, second: IntPoint2D) {
-		left := Int minimum~two(first x, second x)
-		top := Int minimum~two(first y, second y)
+		left := Int minimum(first x, second x)
+		top := Int minimum(first y, second y)
 		width := (first x - second x) abs()
 		height := (first y - second y) abs()
 		this init(left, top, width, height)
@@ -72,17 +73,17 @@ IntBox2D: cover {
 		This createAround(this center, IntSize2D minimum(this size, size))
 	}
 	intersection: func (other: This) -> This {
-		left := Int maximum~two(this left, other left)
-		top := Int maximum~two(this top, other top)
-		width := Int maximum~two(0, Int minimum~two(this right, other right) - left)
-		height := Int maximum~two(0, Int minimum~two(this bottom, other bottom) - top)
+		left := Int maximum(this left, other left)
+		top := Int maximum(this top, other top)
+		width := Int maximum(0, Int minimum(this right, other right) - left)
+		height := Int maximum(0, Int minimum(this bottom, other bottom) - top)
 		This new(left, top, width, height)
 	}
 	union: func ~box (other: This) -> This { // Rock bug: Union without suffix cannot be used because the C name conflicts with keyword "union"
-		left := Int minimum~two(this left, other left)
-		top := Int minimum~two(this top, other top)
-		width := Int maximum~two(0, Int maximum(this right, other right) - left)
-		height := Int maximum~two(0, Int maximum(this bottom, other bottom) - top)
+		left := Int minimum(this left, other left)
+		top := Int minimum(this top, other top)
+		width := Int maximum(0, Int maximum(this right, other right) - left)
+		height := Int maximum(0, Int maximum(this bottom, other bottom) - top)
 		This new(left, top, width, height)
 	}
 	union: func ~point (point: IntPoint2D) -> This {
@@ -124,18 +125,18 @@ IntBox2D: cover {
 		parts free()
 		result
 	}
-	create: static func (leftTop: IntPoint2D, size: IntSize2D) -> This { This new(leftTop, size) }
-	create: static func ~fromFloats (left, top, width, height: Int) -> This { This new(left, top, width, height) }
-	createAround: static func (center: IntPoint2D, size: IntSize2D) -> This { This new(center + (-size) / 2, size) }
-	bounds: func (left, right, top, bottom: Int) -> This { This new(left, top, right - left, bottom - top) }
-	bounds: func ~fromArray (points: IntPoint2D[]) -> This { this bounds(points as ArrayList<IntPoint2D>) }
-	bounds: func ~fromList (points: ArrayList<IntPoint2D>) -> This {
+	createAround: static func (center: IntPoint2D, size: IntSize2D) -> This { This new(center - size / 2, size) }
+	bounds: static func (left, right, top, bottom: Int) -> This { This new(left, top, right - left, bottom - top) }
+	bounds: static func ~fromArray (points: IntPoint2D[]) -> This { This bounds(points data, points length) }
+	bounds: static func ~fromList (points: VectorList<IntPoint2D>) -> This { This bounds(points pointer as IntPoint2D*, points count) }
+	bounds: static func ~fromPointer (data: IntPoint2D*, count: Int) -> This {
 		xMinimum := 0
 		xMaximum := xMinimum
 		yMinimum := xMinimum
 		yMaximum := xMinimum
 		initialized := false
-		for (point in points) {
+		for (i in 0 .. count) {
+			point := data[i]
 			if (!initialized) {
 				initialized = true
 				xMinimum = point x

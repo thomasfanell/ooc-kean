@@ -13,26 +13,16 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-
+use ooc-base
 use ooc-math
 import math
-
-//IColor: interface {
-//	set: func (color: IColor)
-//	toMonochrome: func -> ColorMonochrome
-//	toBgr: func -> ColorBgr
-//	toBgra: func -> ColorBgra
-//	toYuv: func -> ColorYuv
-//	copy: func -> IColor
-//	blend: func (factor: Float, other: IColor) -> Color
-//	distance: func (other: IColor) -> Float
-//}
 
 ColorMonochrome: cover {
 	y: UInt8
 	set: func (color: This) {
 		this y = color y
 	}
+	normalized ::= this y as Float / 255
 	init: func@ (=y)
 	init: func@ ~default { this init(0) }
 	init: func@ ~int (i: Int) { this init(i as UInt8) }
@@ -70,6 +60,7 @@ ColorUv: cover {
 		this u = color u
 		this v = color v
 	}
+	normalized ::= FloatTuple2 new(this u as Float / 255, this v as Float / 255)
 	init: func@ (=u, =v)
 	init: func@ ~default { this init(0, 0) }
 	init: func@ ~int (i: Int) { this init(i as UInt8) }
@@ -109,6 +100,7 @@ ColorYuv: cover {
 		this u = color u
 		this v = color v
 	}
+	normalized ::= FloatTuple3 new(this y as Float / 255, this u as Float / 255, this v as Float / 255)
 	init: func@ (=y, =u, =v)
 	init: func@ ~default { this init(0, 0, 0) }
 	init: func@ ~int (y, u, v: Int) { this init(y as UInt8, u as UInt8, v as UInt8) }
@@ -143,6 +135,7 @@ ColorYuv: cover {
 ColorYuva: cover {
 	yuv: ColorYuv
 	alpha: UInt8
+	normalized ::= FloatTuple4 new(this yuv y as Float / 255, this yuv u as Float / 255, this yuv v as Float / 255, this alpha as Float / 255)
 	init: func@ (=yuv, =alpha)
 	init: func@ ~uint8 (y, u, v, a: UInt8) {
 		this yuv = ColorYuv new(y, u, v)
@@ -168,6 +161,7 @@ ColorBgr: cover {
 		this green = color green
 		this red = color red
 	}
+	normalized ::= FloatTuple3 new(this blue as Float / 255, this green as Float / 255, this red as Float / 255)
 	init: func@ (=blue, =green, =red)
 	init: func@ ~default { this init(0, 0, 0) }
 	init: func@ ~int (b, g, r: Int) { this init(b as UInt8, g as UInt8, r as UInt8) }
@@ -213,7 +207,7 @@ ColorBgra: cover {
 	blue: UInt8 { get { this bgr blue } set (value) { this bgr blue = value } }
 	green: UInt8 { get { this bgr green } set (value) { this bgr green = value } }
 	red: UInt8 { get { this bgr red } set (value) { this bgr red = value } }
-	normalized ::= FloatPoint4D new(this blue as Float / 255, this green as Float / 255, this red as Float / 255, this alpha as Float / 255)
+	normalized ::= FloatTuple4 new(this blue as Float / 255, this green as Float / 255, this red as Float / 255, this alpha as Float / 255)
 	init: func@ (=bgr, =alpha)
 	init: func@ ~default { this init(0, 0, 0, 0) }
 	init: func@ ~uint8 (b, g, r, a: UInt8) { this init(ColorBgr new(b, g, r), a) }

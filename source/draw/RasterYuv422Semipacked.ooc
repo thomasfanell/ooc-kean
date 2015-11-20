@@ -30,39 +30,10 @@ import io/Reader
 import io/FileWriter
 
 RasterYuv422Semipacked: class extends RasterPacked {
-	bytesPerPixel: Int { get { 2 } }
+	bytesPerPixel ::= 2
 	init: func ~allocate (size: IntSize2D) { super~allocate(size) }
 	init: func ~fromByteBuffer (buffer: ByteBuffer, size: IntSize2D) { super(buffer, size, this bytesPerPixel * size width) }
 	init: func ~fromRasterImage (original: RasterImage) { super(original) }
-	createFrom: func ~fromRasterImage (original: RasterImage) {
-		// TODO: Figure out what this function does and whether to remove it
-//		"RasterYuv420 init ~fromRasterImage, original: (#{original size}), this: (#{this size}), y stride #{this y stride}" println()
-		y := 0
-		x := 0
-		width := this size width
-		row := this buffer pointer as UInt8*
-		destination := row
-//		C#: original.Apply(color => *((Color.Bgra*)destination++) = new Color.Bgra(color, 255));
-		f := func (color: ColorYuv) {
-			if (x % 2) {
-				destination@ = color v
-			} else {
-				destination@ = color u
-			}
-			destination += 1
-			destination@ = color y
-			destination += 1
-			x += 1
-			if (x >= width) {
-				x = 0
-				y += 1
-
-				row += this stride
-				destination = row
-			}
-		}
-		original apply(f)
-	}
 	create: func (size: IntSize2D) -> Image {
 		result := This new(size)
 		result crop = this crop
@@ -75,7 +46,9 @@ RasterYuv422Semipacked: class extends RasterPacked {
 		result
 	}
 	apply: func ~bgr (action: Func(ColorBgr)) {
-		this apply(ColorConvert fromYuv(action))
+		convert := ColorConvert fromYuv(action)
+		this apply(convert)
+		(convert as Closure) dispose()
 	}
 	apply: func ~yuv (action: Func (ColorYuv)) {
 		row := this buffer pointer as UInt8*
@@ -92,7 +65,9 @@ RasterYuv422Semipacked: class extends RasterPacked {
 		}
 	}
 	apply: func ~monochrome (action: Func(ColorMonochrome)) {
-		this apply(ColorConvert fromYuv(action))
+		convert := ColorConvert fromYuv(action)
+		this apply(convert)
+		(convert as Closure) dispose()
 	}
 	operator [] (x, y: Int) -> ColorYuv {
 		result := ColorYuv new()
@@ -111,13 +86,10 @@ RasterYuv422Semipacked: class extends RasterPacked {
 		}
 	}
 	open: static func (filename: String) -> This {
-		x, y, imageComponents: Int
-		requiredComponents := 3
-		data := StbImage load(filename, x&, y&, imageComponents&, requiredComponents)
-		bgr := RasterBgr new(ByteBuffer new(data as UInt8*, x * y * requiredComponents), IntSize2D new(x, y))
-		result := This new(bgr)
+		bgr := RasterBgr open(filename)
+		result := This convertFrom(bgr)
 		bgr referenceCount decrease()
-		return result
+		result
 	}
 	save: func (filename: String) {
 		bgr := RasterBgr convertFrom(this)
@@ -128,6 +100,35 @@ RasterYuv422Semipacked: class extends RasterPacked {
 		fileWriter := FileWriter new(filename)
 		fileWriter write(this buffer pointer as Char*, this buffer size)
 		fileWriter close()
+	}
+	convertFrom: static func (original: RasterImage) -> This {
+		result: This
+		if (original instanceOf?(This))
+			result = (original as This) copy()
+		else {
+			result = This new(original size)
+			y := 0
+			x := 0
+			width := result size width
+			row := result buffer pointer as UInt8*
+			destination := row
+			f := func (color: ColorYuv) {
+				destination@ = (x % 2) ? color v : color u
+				destination += 1
+				destination@ = color y
+				destination += 1
+				x += 1
+				if (x >= width) {
+					x = 0
+					y += 1
+					row += result stride
+					destination = row
+				}
+			}
+			original apply(f)
+			(f as Closure) dispose()
+		}
+		result
 	}
 	openRaw: static func (filename: String, size: IntSize2D) -> This {
 		fileReader := FileReader new(FStream open(filename, "rb"))

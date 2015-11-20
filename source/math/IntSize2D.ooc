@@ -13,10 +13,10 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 import math
 import IntPoint2D
 import FloatSize2D
-import structs/ArrayList
 use ooc-base
 
 IntSize2D: cover {
@@ -31,12 +31,11 @@ IntSize2D: cover {
 	init: func@ ~default { this init(0, 0) }
 	scalarProduct: func (other: This) -> Int { this width * other width + this height * other height }
 	swap: func -> This { This new(this height, this width) }
-	minimum: func (ceiling: This) -> This { This new(Int minimum~two(this width, ceiling width), Int minimum~two(this height, ceiling height)) }
-	maximum: func (floor: This) -> This { This new(Int maximum~two(this width, floor width), Int maximum~two(this height, floor height)) }
+	minimum: func (ceiling: This) -> This { This new(Int minimum(this width, ceiling width), Int minimum(this height, ceiling height)) }
+	maximum: func (floor: This) -> This { This new(Int maximum(this width, floor width), Int maximum(this height, floor height)) }
 	minimum: func ~Int (ceiling: Int) -> This { this minimum(This new(ceiling)) }
 	maximum: func ~Int (floor: Int) -> This { this maximum(This new(floor)) }
 	clamp: func (floor, ceiling: This) -> This { This new(this width clamp(floor width, ceiling width), this height clamp(floor height, ceiling height)) }
-	fillEven: static func (other: This) -> This { This new(other width + (other width % 2 == 1 ? 1 : 0), other height + (other height % 2 == 1 ? 1 : 0)) }
 	operator + (other: This) -> This { This new(this width + other width, this height + other height) }
 	operator + (other: IntPoint2D) -> This { This new(this width + other x, this height + other y) }
 	operator - (other: This) -> This { This new(this width - other width, this height - other height) }
@@ -56,7 +55,7 @@ IntSize2D: cover {
 	operator > (other: This) -> Bool { this width > other width && this height > other height }
 	operator <= (other: This) -> Bool { this width <= other width && this height <= other height }
 	operator >= (other: This) -> Bool { this width >= other width && this height >= other height }
-	polar: static func (radius, azimuth: Int) -> This { This new(radius * cos(azimuth), radius * sin(azimuth)) }
+	polar: static func (radius, azimuth: Float) -> This { This new((radius * cos(azimuth)) as Int, (radius * sin(azimuth)) as Int) }
 	toFloatSize2D: func -> FloatSize2D { FloatSize2D new(this width as Float, this height as Float) }
 	toIntPoint2D: func -> IntPoint2D { IntPoint2D new(this width, this height) }
 	operator as -> String { this toString() }

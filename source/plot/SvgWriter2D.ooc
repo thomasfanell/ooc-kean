@@ -16,18 +16,14 @@ SvgWriter2D: class {
 	size: FloatSize2D { get set }
 	fontSize: Int { get set }
 	numberOfPlotsHorizontally: Int
-
 	init: func (=file) {
-		this svgPlots = VectorList<SvgPlot> new()
-		this size = FloatSize2D new(1920, 1080)
-		this fontSize = 14
+		this init(file, VectorList<SvgPlot> new())
 	}
 	init: func ~fileName (filename: String) {
 		this init(File new(filename))
 	}
 	init: func ~svgPlot (file: File, args: ...) {
 		this init(file)
-
 		iterator := args iterator()
 		while (iterator hasNext?()) {
 			match (iterator getNextType()) {
@@ -45,24 +41,21 @@ SvgWriter2D: class {
 	init: func ~withPositioningFilename (filename: String, =numberOfPlotsHorizontally, args: ...) {
 		this init(File new(filename), args)
 	}
-	init: func ~svgPlots (file: File, svgPlots: VectorList<SvgPlot>) {
-		this init(file)
-		this svgPlots = svgPlots
-	}
 	init: func ~svgPlotsFilename (filename: String, svgPlots: VectorList<SvgPlot>) {
-		this init(File new(filename))
-		this svgPlots = svgPlots
+		this init(File new(filename), svgPlots)
+	}
+	init: func ~svgPlotsFile (=file, =svgPlots) {
+		this size = FloatSize2D new(1920, 1080)
+		this fontSize = 14
 	}
 	free: override func {
 		svgPlots free()
 		file free()
 		super()
 	}
-
 	addPlot: func (svgPlot: SvgPlot) {
 		this svgPlots add(svgPlot)
 	}
-
 	write: func {
 		output := prepareOutput()
 		fileWriter := FileWriter new(this file, false)
@@ -71,14 +64,11 @@ SvgWriter2D: class {
 		output free()
 		fileWriter free()
 	}
-
 	prepareOutput: func -> String {
 		result := "<?xml version='1.0' standalone='no'?>\n"
 		result = result >> "<!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' 'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'>\n"
 		result = result >> "<svg xmlns:svg='http://www.w3.org/2000/svg' xmlns='http://www.w3.org/2000/svg' version='1.1' width='" & this size width toString() >> "' height='" & this size height toString() >> "'>\n"
-
 		result = result >> "<rect desc='background' width='100%' height='100%' fill='white'/>\n"
-
 		if (!this svgPlots empty) {
 			numPlotsX: Int
 			numPlotsY: Int
@@ -89,27 +79,21 @@ SvgWriter2D: class {
 					numPlotsX = 2
 				else
 					numPlotsX = 3
-
 				numPlotsY = Int modulo(this svgPlots count, numPlotsX) ? 1 + this svgPlots count / numPlotsX : this svgPlots count / numPlotsX
 			} else {
 				numPlotsX = numberOfPlotsHorizontally
 				numPlotsY = ceil(this svgPlots count as Float / numPlotsX as Float) as Int
 			}
-
 			plotSize := FloatSize2D new(this size width / numPlotsX, this size height / numPlotsY)
 			position := FloatPoint2D new()
-
 			for (i in 0 .. this svgPlots count) {
 				position x = plotSize width * Int modulo(i, numPlotsX)
 				position y = plotSize height * (i / numPlotsX)
-
 				result = result >> "<svg desc='Plot " & (i + 1) toString() >> "' x='" & position x toString() >> "' y='" & position y toString() >> "' width='" & plotSize width toString() >> "' height='" & plotSize height toString() >> "'>\n"
 				result = result & svgPlots[i] getSvg(plotSize, fontSize)
 				result = result >> "</svg>\n"
 			}
 		}
-
-		result = result >> "</svg>\n"
-		result
+		result >> "</svg>\n"
 	}
 }
