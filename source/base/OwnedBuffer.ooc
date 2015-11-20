@@ -37,7 +37,7 @@ OwnedBuffer: cover {
 		if (this _owner == Owner Receiver && this _pointer != null)
 			this _owner = Owner Sender
 		this
-	}
+	} foobar
 	give: func -> This { // call by value -> modifies copy of cover
 		if (this _owner == Owner Sender && this _pointer != null)
 			this _owner = Owner Receiver
