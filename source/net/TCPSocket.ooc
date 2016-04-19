@@ -72,6 +72,12 @@ TCPSocket: class extends Socket {
 		init(SocketAddress new(ip, port))
 	}
 
+	free: override func {
+		this remote free()
+		this readerWriter = null
+		super()
+	}
+
 	/**
 	   Attempt to connect this socket to the remote host.
 
@@ -222,7 +228,6 @@ TCPSocketReader: class extends Reader {
 
 	init: func (=source) { marker = 0 }
 	close: override func { source close() }
-
 	read: override func (chars: Char*, offset: Int, count: Int) -> SizeT {
 		skip(offset - marker)
 		source receive(chars, count, 0)
@@ -265,5 +270,9 @@ TCPReaderWriterPair: class {
 	}
 	close: func {
 		sock close()
+	}
+	free: func {
+		(this sock, this in, this out) free()
+		super()
 	}
 }

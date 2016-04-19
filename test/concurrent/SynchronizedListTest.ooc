@@ -136,7 +136,7 @@ SynchronizedListTest: class extends Fixture {
 			expect(newList[0], is equal to("1"))
 			expect(newList[1], is equal to("2"))
 			expect(newList[2], is equal to("3"))
-			list free(); newList free()
+			(list, newList) free()
 		})
 		this add("single thread - fold", func {
 			list := SynchronizedList<Int> new()
@@ -267,19 +267,25 @@ SynchronizedListTest: class extends Fixture {
 			threads[i] wait() . free()
 		expect(list count, is equal to(numberOfThreads * countPerThread))
 		(job as Closure) free()
+
+		validResult := true
+		globalMutex := Mutex new(MutexType Global)
 		job = func {
 			for (i in 0 .. countPerThread) {
 				value := list remove(0)
-				expect(value, is greater than(-1))
-				expect(value, is less than(countPerThread))
+				if (value < 0 || value >= countPerThread)
+					globalMutex with(|| validResult = false)
 			}
 		}
 		for (i in 0 .. numberOfThreads)
 			threads[i] = Thread new(job) . start()
 		for (i in 0 .. numberOfThreads)
 			threads[i] wait() . free()
+		expect(validResult, is true)
 		expect(list count, is equal to(0))
 		(job as Closure) free()
+		globalMutex free()
+
 		job = func {
 			for (i in 0 .. countPerThread)
 				list add(i) . remove(0)
@@ -308,11 +314,14 @@ SynchronizedListTest: class extends Fixture {
 			threads[i] wait() . free()
 		expect(list count, is equal to(numberOfThreads * countPerThread))
 		(job as Closure) free()
+
+		validResult := true
+		globalMutex := Mutex new(MutexType Global)
 		job = func {
 			for (i in 0 .. countPerThread) {
 				value := list remove(0)
-				expect(value get(), is greater than(-1))
-				expect(value get(), is less than(countPerThread))
+				if (value get() < 0 || value get() >= countPerThread)
+					globalMutex with(|| validResult = false)
 				value free()
 			}
 		}
@@ -320,10 +329,12 @@ SynchronizedListTest: class extends Fixture {
 			threads[i] = Thread new(job) . start()
 		for (i in 0 .. numberOfThreads)
 			threads[i] wait() . free()
+		expect(validResult, is true)
 		expect(list count, is equal to(0))
 		(job as Closure) free()
 		threads free()
 		list free()
+		globalMutex free()
 	}
 }
 

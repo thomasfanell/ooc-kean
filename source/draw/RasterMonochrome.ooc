@@ -9,6 +9,7 @@
 use base
 use math
 use geometry
+use draw
 import RasterPacked
 import RasterImage
 import StbImage
@@ -25,15 +26,17 @@ RasterMonochromeCanvas: class extends RasterPackedCanvas {
 		if (this target isValidIn(position x, position y))
 			this target[position x, position y] = this target[position x, position y] blend(pen alphaAsFloat, pen color toMonochrome())
 	}
-	draw: override func ~ImageSourceDestination (image: Image, source, destination: IntBox2D) {
+	_draw: override func (image: Image, source, destination: IntBox2D, interpolate: Bool) {
 		monochrome: RasterMonochrome = null
-		if (image instanceOf(RasterMonochrome))
+		if (image == null)
+			Debug error("Null image in RasterMonochromeCanvas draw")
+		else if (image instanceOf(RasterMonochrome))
 			monochrome = image as RasterMonochrome
 		else if (image instanceOf(RasterImage))
 			monochrome = RasterMonochrome convertFrom(image as RasterImage)
 		else
 			Debug error("Unsupported image type in RasterMonochromeCanvas draw")
-		this _resizePacked(monochrome buffer pointer as ColorMonochrome*, monochrome, source, destination)
+		this _resizePacked(monochrome buffer pointer as ColorMonochrome*, monochrome, source, destination, interpolate)
 		if (monochrome != image)
 			monochrome referenceCount decrease()
 	}
@@ -68,14 +71,11 @@ RasterMonochrome: class extends RasterPacked {
 			}
 	}
 	resizeTo: override func (size: IntVector2D) -> This {
-		this resizeTo(size, InterpolationMode Smooth) as This
+		this resizeTo(size, true) as This
 	}
-	resizeTo: override func ~withMethod (size: IntVector2D, method: InterpolationMode) -> This {
+	resizeTo: override func ~withMethod (size: IntVector2D, interpolate: Bool) -> This {
 		result := This new(size)
-		result canvas interpolationMode = method
-		result canvas draw(this, IntBox2D new(this size), IntBox2D new(size))
-		//TODO will be fixed by subcanvas
-		result canvas interpolationMode = InterpolationMode Fast
+		DrawState new(result) setInputImage(this) setInterpolate(interpolate) draw()
 		result
 	}
 	distance: override func (other: Image) -> Float {
@@ -206,21 +206,117 @@ RasterMonochrome: class extends RasterPacked {
 			result = (original as This) copy()
 		else {
 			result = This new(original)
-			row := result buffer pointer as Long
+			row := result buffer pointer as PtrDiff
 			rowLength := result stride
 			rowEnd := row + rowLength
-			destination := row
+			destination := row as ColorMonochrome*
 			f := func (color: ColorMonochrome) {
-				(destination as ColorMonochrome*)@ = color
+				destination@ = color
 				destination += 1
 				if (destination >= rowEnd) {
-					row += result stride
-					destination = row
+					row += result stride as PtrDiff
+					destination = row as ColorMonochrome*
 					rowEnd = row + rowLength
 				}
 			}
 			original apply(f)
 			(f as Closure) free()
+		}
+		result
+	}
+	// Serialize to a lossy ascii image using an alphabet
+	// Precondition: alphabet may not have extended ascii, non printable, '\', '"', '>' or linebreak
+	// Example alphabet: " .,-_':;!+~=^?*abcdefghijklmnopqrstuvwxyz()[]{}|&%@#0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	toAscii: func (alphabet: String) -> String {
+		result := CharBuffer new(((this size x + 3) * this size y) + 1)
+		// Generate mapping from luma to character
+		alphabetMap: Char[256]
+		scale := ((alphabet size - 1) as Float) / 255.0f
+		output := 0.49f
+		for (rawValue in 0 .. 256) {
+			alphabetMap[rawValue] = alphabet[(output as Int) clamp(0, alphabet size - 1)]
+			output += scale
+		}
+
+		result append('<') . append(alphabet) . append('>') . append('\n')
+		for (y in 0 .. this size y) {
+			result append('<')
+			for (x in 0 .. this size x)
+				result append(alphabetMap[this[x, y] y])
+			result append('>')
+			result append('\n')
+		}
+		result append('\0')
+		String new(result)
+	}
+	// Parse an ascii image
+	fromAscii: static func (content: String) -> This {
+		// Measure dimensions and read the alphabet
+		alphabet: Char[128]
+		alphabetSize := 0
+		(x, y, width, height) := (0, -1, 0, 0)
+		quoted := false
+		current: Char
+		i := 0
+		while (i < content size && ((current = content[i]) != '\0')) {
+			if (quoted) {
+				if (y < 0) {
+					if (current == '>') {
+						quoted = false
+						y = 0
+					} else if (alphabetSize < 128) {
+						alphabet[alphabetSize] = current
+						alphabetSize += 1
+					}
+				} else {
+					if (current == '>') {
+						quoted = false
+						width = width maximum(x)
+						y += 1
+						x = 0
+					} else
+						x += 1
+				}
+			} else if (current == '<')
+				quoted = true
+			i += 1
+		}
+		raise(alphabetSize < 2, "The alphabet needs at least two characters!")
+		height = y
+		raise(x > 0, "All hexadecimal images must end with a linebreak!")
+		// Create alphabet mapping from character to luma
+		alphabetMap: Byte[128]
+		for (i in 0 .. 128)
+			alphabetMap[i] = 0
+		for (i in 0 .. alphabetSize) {
+			code := alphabet[i] as Int
+			if (code < 32 || code > 126)
+				raise("Character '" + alphabet[i] + "' (" + code toString() + ") is not printable standard ascii!")
+			if (alphabetMap[code] > 0)
+				raise("Character '" + alphabet[i] + "' (" + code toString() + ") is used more than once!")
+			value := ((i as Float) * (255.0f / ((alphabetSize - 1) as Float))) as Int clamp(0, 255)
+			alphabetMap[code] = value
+		}
+
+		raise(width <= 0 || height <= 0, "An ascii image had zero dimensions!")
+		result := This new(IntVector2D new(width, height))
+		(x, y) = (0, -1)
+		quoted = false
+		i = 0
+		while (i < content size && ((current = content[i]) != '\0')) {
+			if (quoted) {
+				if (current == '>') {
+					quoted = false
+					raise(y >= 0 && x != width, "Lines in the ascii image do not have the same length.")
+					y += 1
+					x = 0
+				} else if (y >= 0) {
+					result[x, y] = ColorMonochrome new(alphabetMap[(current as Int) clamp(0, 127)])
+					x += 1
+				}
+			} else if (current == '<')
+				quoted = true
+			i += 1
 		}
 		result
 	}

@@ -12,7 +12,7 @@ use draw
 use draw-gpu
 use collections
 use concurrent
-import OpenGLPacked, OpenGLMonochrome, OpenGLRgb, OpenGLRgba, OpenGLUv, OpenGLMesh, OpenGLCanvas, _RecycleBin, OpenGLPromise
+import OpenGLPacked, OpenGLMonochrome, OpenGLRgb, OpenGLRgba, OpenGLUv, OpenGLMesh, OpenGLCanvas, OpenGLPromise
 import OpenGLMap
 import backend/[GLContext, GLRenderer]
 
@@ -38,13 +38,22 @@ OpenGLContext: class extends GpuContext {
 	_pointsShader: OpenGLMap
 	_meshShader: OpenGLMapMesh
 	_renderer: GLRenderer
-	_recycleBin := _RecycleBin new()
+	_recycleBin: RecycleBin<OpenGLPacked>
 	backend ::= this _backend
 	meshShader ::= this _meshShader
 	defaultMap ::= this _transformTextureMap as Map
-
+	_defaultFontGpu: GpuImage = null
+	defaultFontGpu: GpuImage { get {
+		if (this _defaultFontGpu == null)
+			this _defaultFontGpu = this createImage(this defaultFontRaster)
+		this _defaultFontGpu
+	}}
 	init: func ~backend (=_backend) {
 		super()
+		this _recycleBin = RecycleBin<OpenGLPacked> new(60, func (image: OpenGLPacked) {
+			image _recyclable = false
+			image free()
+		})
 		this _packMonochrome = OpenGLMap new(slurp("shaders/packMonochrome.vert"), slurp("shaders/packMonochrome.frag"), this)
 		this _packUv = OpenGLMap new(slurp("shaders/packUv.vert"), slurp("shaders/packUv.frag"), this)
 		this _packUvPadded = OpenGLMap new(slurp("shaders/packUvPadded.vert"), slurp("shaders/packUvPadded.frag"), this)
@@ -62,6 +71,8 @@ OpenGLContext: class extends GpuContext {
 	}
 	init: func ~window (display: Pointer, nativeBackend: Long) { this init(GLContext createContext(display, nativeBackend)) }
 	free: override func {
+		if (this _defaultFontGpu != null)
+			this _defaultFontGpu free()
 		this _backend makeCurrent()
 		this _transformTextureMap free()
 		this _packMonochrome free()
@@ -94,16 +105,18 @@ OpenGLContext: class extends GpuContext {
 		this _renderer drawPoints(positions, pointList count, 2)
 	}
 	recycle: virtual func (image: OpenGLPacked) {
-		(image canvas as OpenGLCanvas) onRecycle()
+		image onRecycle()
 		this _recycleBin add(image)
 	}
-	_searchImageBin: func (type: GpuImageType, size: IntVector2D) -> GpuImage { this _recycleBin find(type, size) }
+	_searchImageBin: func (type: Class, size: IntVector2D) -> GpuImage {
+		this _recycleBin search(|image| image instanceOf(type) && image size == size)
+	}
 	createMonochrome: override func (size: IntVector2D) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Monochrome, size)
+		result := this _searchImageBin(OpenGLMonochrome, size)
 		result == null ? OpenGLMonochrome new(size, this) as GpuImage : result
 	}
 	_createMonochrome: func (raster: RasterMonochrome) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Monochrome, raster size)
+		result := this _searchImageBin(OpenGLMonochrome, raster size)
 		if (result == null)
 			result = OpenGLMonochrome new(raster, this)
 		else
@@ -111,11 +124,11 @@ OpenGLContext: class extends GpuContext {
 		result
 	}
 	createUv: override func (size: IntVector2D) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Uv, size)
+		result := this _searchImageBin(OpenGLUv, size)
 		result == null ? OpenGLUv new(size, this) as GpuImage : result
 	}
 	_createUv: func (raster: RasterUv) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Uv, raster size)
+		result := this _searchImageBin(OpenGLUv, raster size)
 		if (result == null)
 			result = OpenGLUv new(raster, this)
 		else
@@ -123,11 +136,11 @@ OpenGLContext: class extends GpuContext {
 		result
 	}
 	createRgb: override func (size: IntVector2D) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Rgb, size)
+		result := this _searchImageBin(OpenGLRgb, size)
 		result == null ? OpenGLRgb new(size, this) as GpuImage : result
 	}
 	_createRgb: func (raster: RasterRgb) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Rgb, raster size)
+		result := this _searchImageBin(OpenGLRgb, raster size)
 		if (result == null)
 			result = OpenGLRgb new(raster, this)
 		else
@@ -135,11 +148,11 @@ OpenGLContext: class extends GpuContext {
 		result
 	}
 	createRgba: override func (size: IntVector2D) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Rgba, size)
+		result := this _searchImageBin(OpenGLRgba, size)
 		result == null ? OpenGLRgba new(size, this) as GpuImage : result
 	}
 	_createRgba: func (raster: RasterRgba) -> GpuImage {
-		result := this _searchImageBin(GpuImageType Rgba, raster size)
+		result := this _searchImageBin(OpenGLRgba, raster size)
 		if (result == null)
 			result = OpenGLRgba new(raster, this)
 		else
@@ -185,5 +198,6 @@ OpenGLContext: class extends GpuContext {
 			vertices[i] = toGL * vertices[i]
 		OpenGLMesh new(vertices, textureCoordinates, this)
 	}
+	getDefaultFont: override func -> Image { this defaultFontGpu }
 }
 }

@@ -15,7 +15,7 @@ WaitLockTest: class extends Fixture {
 		super("WaitLock")
 		this add("_testWithMutexOwnership", This _testWithMutexOwnership)
 		this add("_testWithoutMutexOwnership", This _testWithoutMutexOwnership)
-		this add("_testWakeWithFailingCondition", This _testWakeWithFailingCondition)
+		version (!windows && !android) { this add("_testWakeWithFailingCondition", This _testWakeWithFailingCondition) }
 		this add("_testWakeWithPassingCondition", This _testWakeWithPassingCondition)
 	}
 	_testWithMutexOwnership: static func {
@@ -31,6 +31,8 @@ WaitLockTest: class extends Fixture {
 	}
 	_testWakeWithFailingCondition: static func {
 		This timesTriggered = 0
+		validResult := true
+		globalMutex := Mutex new(MutexType Global)
 		waitLock := WaitLock new()
 		waitingThread := Thread new(||
 			waitLock lockWhen(func -> Bool {
@@ -48,22 +50,26 @@ WaitLockTest: class extends Fixture {
 				waitLock unlock()
 				Thread yield()
 			}
-			expect(This timesTriggered, is equal to(1))
+			if (This timesTriggered != 1)
+				globalMutex with(|| validResult = false)
 			waitLock unlock()
 			waitLock wake()
-			expect(waitingThread wait(0.05), is false)
+			result := waitingThread wait(0.05)
+			if (result == true)
+				globalMutex with(|| validResult = false)
 			waitLock lock()
-			expect(This timesTriggered, is equal to (2))
+			if (This timesTriggered != 2)
+				globalMutex with(|| validResult = false)
 			waitLock unlock()
 		)
 		testThread start()
 		waitingThread start()
-		expect(testThread wait(1.0), is true)
-		testThread free()
+		waitResult := testThread wait(1.0)
+		expect(validResult, is true)
+		expect(waitResult, is true)
 		waitingThread cancel()
 		expect(waitingThread wait(1.0), is true)
-		waitingThread free()
-		waitLock free()
+		(testThread, waitingThread, waitLock, globalMutex) free()
 	}
 	_testWakeWithPassingCondition: static func {
 		This timesTriggered = 0
@@ -101,10 +107,8 @@ WaitLockTest: class extends Fixture {
 		testThread start()
 		waitingThread start()
 		expect(testThread wait(1.0), is true)
-		testThread free()
 		expect(waitingThread alive(), is false)
-		waitingThread free()
-		waitLock free()
+		(testThread, waitingThread, waitLock) free()
 	}
 }
 

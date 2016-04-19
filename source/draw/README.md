@@ -44,6 +44,25 @@ Transforms go from zero in the center and increase with either pixels or pixels 
 Using `DrawState` you can draw things without having to call the canvas directly.
 This is convenient if you have a lot of things to draw that have settings in common.
 
+## Availability of settings
+Using destination or transform on the CPU would require a rewrite of legacy draw calls.
+
+| setting | draw(gpu) | draw(cpu) | write |
+|-|-|-|-|
+| target | X | X | X |
+| inputImage | X | X | X |
+| viewport | X | X |  |
+| source | X | X |  |
+| destination | X |  |  |
+| transform | X |  |  |
+| focalLength | X |  |  |
+| map | X |  |  |
+| mesh | X |  |  |
+| opacity | X |  |  |
+| blendMode | X |  |  |
+| interpolate |  | X |  |
+| origin |  |  | X |
+
 ## How to use
 Create a `DrawState` with a target image as input argument.
 Continue with setters to add information.

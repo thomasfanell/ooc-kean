@@ -6,6 +6,8 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
+include stdint
+
 import native/[ThreadUnix, ThreadWin32]
 
 Thread: abstract class {
@@ -23,8 +25,7 @@ Thread: abstract class {
 			result = ThreadUnix new(_code) as This
 		version (windows)
 			result = ThreadWin32 new(_code) as This
-		if (result == null)
-			Exception new(This, "Unsupported platform!\n") throw()
+		raise(result == null, "Unsupported platform!\n", This)
 		result
 	}
 	currentThread: static func -> This {

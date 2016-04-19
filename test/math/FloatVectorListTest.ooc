@@ -144,6 +144,17 @@ FloatVectorListTest: class extends Fixture {
 			list1 free()
 			list2 free()
 		})
+		this add("scalar product", func {
+			list1 := FloatVectorList new()
+			list2 := FloatVectorList new()
+			list1 add(1.0f) . add(2.0f)
+			list2 add(10.0f) . add(11.0f)
+			expect(list1 scalarProduct(list2), is equal to(32.f) within(tolerance))
+			list1 add(3.0f) . add(4.0f)
+			list2 add(12.0f)
+			expect(list1 scalarProduct(list2), is equal to(68.f) within(tolerance))
+			(list1, list2) free()
+		})
 		this add("operator - (This)", func {
 			list1 := FloatVectorList new()
 			list2 := FloatVectorList new()
@@ -307,7 +318,7 @@ FloatVectorListTest: class extends Fixture {
 			reversed := list reverse()
 			expect(reversed[0], is equal to(-7.0f) within(tolerance))
 			expect(reversed[4], is equal to(2.0f) within(tolerance))
-			list free(); reversed free()
+			(list, reversed) free()
 		})
 		this add("divideByMaxValue", func {
 			list := FloatVectorList new()
@@ -317,7 +328,7 @@ FloatVectorListTest: class extends Fixture {
 			list add(-7.0f)
 			divided := list divideByMaxValue()
 			expect(divided sum, is equal to(-0.5f) within(tolerance))
-			list free(); divided free()
+			(list, divided) free()
 		})
 		this add("interpolateLinear", func {
 			list := FloatVectorList new()

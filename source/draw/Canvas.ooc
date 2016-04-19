@@ -14,28 +14,10 @@ import Image
 import Pen
 import DrawState
 
-InterpolationMode: enum {
-	Fast // nearest neighbour
-	Smooth // bilinear
-}
-
 Canvas: abstract class {
 	_size: IntVector2D
-	_transform := FloatTransform3D identity
 	size ::= this _size
-	viewport: IntBox2D { get set }
-	blend: Bool { get set }
-	opacity: Float { get set }
-	transform: FloatTransform3D { get { this _transform } set(value) { this _transform = value } }
-	focalLength: Float { get set }
-	interpolationMode: InterpolationMode { get set }
-	init: func (=_size) {
-		this viewport = IntBox2D new(this size)
-		this focalLength = 0.0f
-		this blend = false
-		this opacity = 1.0f
-		this interpolationMode = InterpolationMode Fast
-	}
+	init: func (=_size)
 	drawPoint: virtual func ~white (position: FloatPoint2D) { this drawPoint(position, Pen new(ColorRgba white)) }
 	drawPoint: virtual func ~explicit (position: FloatPoint2D, pen: Pen) {
 		list := VectorList<FloatPoint2D> new()
@@ -67,8 +49,28 @@ Canvas: abstract class {
 	}
 	fill: abstract func (color: ColorRgba)
 	draw: virtual func ~DrawState (drawState: DrawState) { Debug error("draw~DrawState unimplemented for class " + this class name + "!") }
-	draw: abstract func ~ImageSourceDestination (image: Image, source, destination: IntBox2D)
-	draw: func ~ImageDestination (image: Image, destination: IntBox2D) { this draw(image, IntBox2D new(image size), destination) }
-	draw: func ~Image (image: Image) { this draw(image, IntBox2D new(image size)) }
-	draw: func ~ImageTargetSize (image: Image, targetSize: IntVector2D) { this draw(image, IntBox2D new(targetSize)) }
+	write: virtual func (target, fontAtlas: Image, localOrigin: IntPoint2D, message: Text) {
+		// Generic reference implementation with all inputs that are used from DrawState to simplify input space partitioning
+		skippedRows := 2
+		visibleRows := 6
+		columns := 16
+		charSize := fontAtlas size / IntVector2D new(columns, visibleRows)
+		viewport := IntBox2D new(localOrigin, charSize)
+		targetOffset := IntPoint2D new(0, 0)
+		characterDrawState := DrawState new(target) setInputImage(fontAtlas) setBlendMode(BlendMode Add)
+		for (i in 0 .. message count) {
+			charCode := message[i] as Int
+			sourceX := charCode % columns
+			sourceY := (charCode / columns) - skippedRows
+			source := FloatBox2D new((sourceX as Float) / columns, (sourceY as Float) / visibleRows, 1.0f / columns, 1.0f / visibleRows)
+			if (charCode > 32 && charCode < 127)
+				characterDrawState setViewport(viewport + (targetOffset * charSize)) setSourceNormalized(source) draw()
+			targetOffset x += 1
+			if (charCode == '\n') {
+				targetOffset x = 0 // Carriage return
+				targetOffset y += 1 // Line feed
+			}
+		}
+		message free(Owner Receiver)
+	}
 }

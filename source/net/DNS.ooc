@@ -17,10 +17,7 @@ DNS: class {
 		Perform DNS lookup using the hostname.
 		Returns information about the host that was found.
 	*/
-	resolve: static func (hostname: String) -> HostInfo {
-		resolve(hostname, 0, 0)
-	}
-	resolve: static func ~filter (hostname: String, socketType: Int, socketFamily: Int) -> HostInfo {
+	resolve: static func ~filter (hostname: String, socketType := 0, socketFamily := 0) -> HostInfo {
 		hints: AddrInfo
 		info: AddrInfo*
 		memset(hints&, 0, hints class size)
@@ -36,13 +33,11 @@ DNS: class {
 		Perform DNS lookup using the hostname.
 		Returns the first IPAddress found for the host.
 	*/
-	resolveOne: static func (host: String) -> IPAddress {
-		info := resolve(host)
-		info addresses()[0]
-	}
-	resolveOne: static func ~filter (host: String, socketType: Int, socketFamily: Int) -> IPAddress {
+	resolveOne: static func (host: String, socketType := 0, socketFamily := 0) -> IPAddress {
 		info := resolve(host, socketType, socketFamily)
-		info addresses()[0]
+		result := info addresses()[0]
+		info free()
+		result
 	}
 
 	/**
@@ -69,7 +64,7 @@ DNS: class {
  */
 HostInfo: class {
 	name: String
-	addresses: LinkedList<IPAddress>
+	addresses: VectorList<IPAddress>
 
 	/**
 	   Create a new HostInfo from an AddrInfo chain.
@@ -78,7 +73,7 @@ HostInfo: class {
 	   get a HostInfo instance from calls to the DNS class.
 	 */
 	init: func (addrinfo: AddrInfo*) {
-		addresses = LinkedList<IPAddress> new()
+		addresses = VectorList<IPAddress> new(8, false)
 		name = addrinfo@ ai_canonname as CString toString()
 		info := addrinfo
 		while (info) {
@@ -98,10 +93,13 @@ HostInfo: class {
 	/**
 		Returns a list of IPAddress associated with this host.
 	*/
-	addresses: func -> LinkedList<IPAddress> { this addresses }
+	addresses: func -> VectorList<IPAddress> { this addresses }
 
 	free: override func {
+		for (_ in 0 .. this addresses count)
+			this addresses remove() free()
 		this addresses free()
+		this name free()
 		super()
 	}
 }

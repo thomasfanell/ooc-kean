@@ -68,9 +68,6 @@ Char: cover from char {
 			}
 		result
 	}
-	compareWith: func (compareFunc: Func (Char, Char*, SizeT) -> SSizeT, target: Char*, targetSize: SizeT) -> SSizeT {
-		compareFunc(this, target, targetSize)
-	}
 	toInt: func -> Int {
 		result := -1
 		if (this digit())
@@ -108,7 +105,7 @@ CString: cover from Char* {
 	toString: func -> String { (this == null) ? null as String : String new(this, this length()) }
 	length: extern (strlen) func -> Int
 	print: func { stdout write(this, 0, this length()) }
-	println: func { stdout write(this, 0, this length()). write('\n') }
+	println: func { stdout write(this, 0, this length()) . write('\n') }
 	new: static func ~withLength (length: Int) -> This {
 		result := calloc(1, length + 1) as Char*
 		result[length] = '\0'

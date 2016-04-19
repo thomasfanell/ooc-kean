@@ -1,7 +1,6 @@
-# Release  2.0.0
+# Release  2.1.0
 
 magic-sdk (formerly ooc-kean)
-========
 This is an extended SDK for `magic`, a high-level cross-platform language which transpiles into C99.
 
 ## History
@@ -13,8 +12,8 @@ To compile, you need the `magic` version of the [Rock compiler](https://github.c
 Tests can be run using the `test.sh` script.
 
 ### Dependencies
-The following software is necessary to build version 2.0.0 of ooc-kean:
-* [rock 1.0.18-head codename Freppasaurus Rex](https://github.com/magic-lang/rock/releases/tag/rock_1.0.18)
+The following software is necessary to build version 2.1.0 of ooc-kean:
+* [rock 1.0.19](https://github.com/magic-lang/rock/releases/tag/rock_1.0.19)
 * gcc 4.8.4
 
 ### Linux

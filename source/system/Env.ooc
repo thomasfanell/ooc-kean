@@ -12,18 +12,25 @@ Env: class {
 		x := getenv(variableName as CString)
 		x != null ? x toString() : null
 	}
-	set: static func (key, value: String, overwrite: Bool) -> Int {
+	set: static func (key, value: String, overwrite := true) -> Int {
 		result := -1
 		if (key != null && value != null) {
-			version(windows)
-				result = putenv("%s=%s" format(key toCString(), value toCString()) toCString())
+			version(windows) {
+				exists := false
+				if (!overwrite) {
+					old := This get(key)
+					if (old != null) {
+						exists = true
+						old free()
+					}
+				}
+				if (overwrite || !exists)
+					result = putenv("%s=%s" format(key toCString(), value toCString()) toCString())
+			}
 			else
 				result = setenv(key toCString(), value toCString(), overwrite)
 		}
 		result
-	}
-	set: static func ~overwrite (key, value: String) -> Int {
-		This set(key, value, true)
 	}
 	unset: static func (key: String) -> Int {
 		result: Int

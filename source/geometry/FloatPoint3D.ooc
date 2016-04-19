@@ -9,6 +9,7 @@
 use math
 import FloatPoint2D
 import IntPoint3D
+import FloatVector3D
 use base
 
 FloatPoint3D: cover {
@@ -45,6 +46,7 @@ FloatPoint3D: cover {
 	clamp: func ~point (floor, ceiling: This) -> This { This new(this x clamp(floor x, ceiling x), this y clamp(floor y, ceiling y), this z clamp(floor z, ceiling z)) }
 	clamp: func ~float (floor, ceiling: Float) -> This { This new(this x clamp(floor, ceiling), this y clamp(floor, ceiling), this z clamp(floor, ceiling)) }
 	toIntPoint3D: func -> IntPoint3D { IntPoint3D new(this x as Int, this y as Int, this z as Int) }
+	toFloatVector3D: func -> FloatVector3D { FloatVector3D new(this x, this y, this z) }
 	toString: func -> String { "%.8f" formatFloat(this x) >> ", " & "%.8f" formatFloat(this y) >> ", " & "%.8f" formatFloat(this z) }
 	toText: func -> Text { this x toText() + t", " + this y toText() + t", " + this z toText() }
 
@@ -59,6 +61,10 @@ FloatPoint3D: cover {
 	operator >= (other: This) -> Bool { this x >= other x && this y >= other y && this z >= other z }
 	operator == (other: This) -> Bool { this x equals(other x) && this y equals(other y) && this z equals(other z) }
 	operator != (other: This) -> Bool { !(this == other) }
+	operator + (other: FloatVector3D) -> This { This new(this x + other x, this y + other y, this z + other z) }
+	operator - (other: FloatVector3D) -> This { This new(this x - other x, this y - other y, this z - other z) }
+	operator * (other: FloatVector3D) -> This { This new(this x * other x, this y * other y, this z * other z) }
+	operator / (other: FloatVector3D) -> This { This new(this x / other x, this y / other y, this z / other z) }
 	operator * (other: Float) -> This { This new(this x * other, this y * other, this z * other) }
 	operator / (other: Float) -> This { This new(this x / other, this y / other, this z / other) }
 

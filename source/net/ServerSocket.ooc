@@ -31,13 +31,15 @@ ServerSocket: class extends Socket {
 	*/
 	init: func ~ipPortBacklogAndListen (ip := "0.0.0.0", port: Int, bl := 100, enabled := false) {
 		backlog = bl
-		ip = DNS resolveOne(ip) toString()
+		resolved := DNS resolveOne(ip)
+		ip = resolved toString()
+		resolved free()
 		type = ipType(ip)
 		super(type, SocketType STREAM, 0)
 		this bind(ip, port)
-		if (enabled) {
+		if (enabled)
 			this listen()
-		}
+		ip free()
 	}
 
 	/**
@@ -73,6 +75,7 @@ ServerSocket: class extends Socket {
 	bind: func ~withAddr (addr: SocketAddress) {
 		if (bind(descriptor, addr addr(), addr length()) == -1)
 			raise("SocketError bind")
+		addr free()
 	}
 
 	/**
@@ -100,14 +103,14 @@ ServerSocket: class extends Socket {
 		This method will normally block if no connection is
 		available immediately.
 	*/
-	accept: func -> TCPServerReaderWriterPair {
+	accept: func -> TCPReaderWriterPair {
 		addr: SockAddr
 		addrSize: UInt = SockAddr size
 		conn := accept(descriptor, addr&, addrSize&)
 		if (conn == -1)
 			raise("Failed to accept an incoming connection.")
 		sock := TCPSocket new(SocketAddress newFromSock(addr&, addrSize), conn)
-		TCPServerReaderWriterPair new(sock)
+		TCPReaderWriterPair new(sock)
 	}
 
 	/**
@@ -115,7 +118,7 @@ ServerSocket: class extends Socket {
 
 		This method will block.
 	*/
-	accept: func ~withClosure (f: Func (TCPServerReaderWriterPair) -> Bool) {
+	accept: func ~withClosure (f: Func (TCPReaderWriterPair) -> Bool) {
 		if (!this listening)
 			this listen()
 
@@ -134,9 +137,4 @@ ServerSocket: class extends Socket {
 				break // Break out of the loop if one of conn or ret is 0 or null
 		}
 	}
-}
-
-// Workaround to let TCPReaderWriterPair be in this file
-TCPServerReaderWriterPair: class extends TCPReaderWriterPair {
-	init: func (=sock) { super(sock) }
 }
