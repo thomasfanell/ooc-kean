@@ -35,10 +35,10 @@ ByteBufferTest: class extends Fixture {
 			for (i in 0 .. 1024 / 8)
 				buffer pointer[i] = i
 			buffercopy := buffer copy()
-			buffer free()
 			for (i in 0 .. 1024 / 8)
 				expect(buffercopy pointer[i] as Int, is equal to(buffer pointer[i] as Int))
-			buffercopy referenceCount decrease()
+			buffer free()
+			buffercopy free()
 		})
 		this add("slice", func {
 			buffer := ByteBuffer new(1024)
@@ -53,10 +53,30 @@ ByteBufferTest: class extends Fixture {
 			yuv := ByteBuffer new(30000)
 			y := yuv slice(0, 20000)
 			uv := yuv slice(20000, 10000)
-			expect(yuv referenceCount _count, is equal to(2))
+			expect(yuv referenceCount count, is equal to(2))
 			y referenceCount decrease()
-			expect(yuv referenceCount _count, is equal to(1))
+			expect(yuv referenceCount count, is equal to(1))
 			uv referenceCount decrease()
+		})
+		this add("memset", func {
+			buffer := ByteBuffer new(64)
+			for (i in 0 .. 64)
+				buffer pointer[i] = i
+			buffer memset(35)
+			for (i in 0 .. 64)
+				expect(buffer pointer[i] as Int, is equal to(35))
+			buffer referenceCount decrease()
+		})
+		this add("memset range", func {
+			buffer := ByteBuffer new(64)
+			for (i in 0 .. 64)
+				buffer pointer[i] = i
+			buffer memset(1, 62, 35)
+			expect(buffer pointer[0] as Int, is equal to(0))
+			for (i in 1 .. 63)
+				expect(buffer pointer[i] as Int, is equal to(35))
+			expect(buffer pointer[63] as Int, is equal to(63))
+			buffer referenceCount decrease()
 		})
 	}
 }

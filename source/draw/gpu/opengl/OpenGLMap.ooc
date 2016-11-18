@@ -18,40 +18,27 @@ version(!gpuOff) {
 OpenGLMap: class extends Map {
 	_vertexSource: String
 	_fragmentSource: String
-	_program: GLShaderProgram[]
-	_currentProgram: GLShaderProgram { get {
-		index := this _context getCurrentIndex()
-		result := this _program[index]
-		if (result == null) {
-			result = this _context _backend createShaderProgram(this _vertexSource, this _fragmentSource)
-			this _program[index] = result
-		}
-		result
-	}}
+	_program: GLShaderProgram = null
 	_context: OpenGLContext
 	init: func (vertexSource: String, fragmentSource: String, context: OpenGLContext) {
 		super()
 		this _vertexSource = vertexSource
 		this _fragmentSource = fragmentSource
 		this _context = context
-		this _program = GLShaderProgram[context getMaxContexts()] new()
+		this _program = this _context _backend createShaderProgram(this _vertexSource, this _fragmentSource)
 		if (vertexSource == null || fragmentSource == null)
 			Debug error("Vertex or fragment shader source not set")
 	}
 	init: func ~defaultVertex (fragmentSource: String, context: OpenGLContext) { this init(slurp("shaders/default.vert"), fragmentSource, context) }
 	free: override func {
-		for (i in 0 .. this _context getMaxContexts()) {
-			if (this _program[i] != null)
-				this _program[i] free()
-		}
 		this _program free()
 		super()
 	}
-	use: override func (forbiddenInput: Pointer) {
-		this _currentProgram use()
+	useProgram: override func (forbiddenInput: Pointer, positionTransform, textureTransform: FloatTransform3D) {
+		this _program useProgram()
 		textureCount := 0
 		action := func (key: String, value: Object) {
-			program := this _currentProgram
+			program := this _program
 			if (value instanceOf(Cell)) {
 				cell := value as Cell
 				match (cell T) {
@@ -80,7 +67,7 @@ OpenGLMap: class extends Map {
 					case image: OpenGLPacked =>
 						version(safe)
 							if (forbiddenInput != null && (forbiddenInput as Pointer) == (image as Pointer))
-								raise("Input image " + key + " is also the target.")
+								Debug error("Input image " + key + " is also the target.")
 						image backend bind(textureCount)
 						program setUniform(key, textureCount)
 						textureCount += 1
@@ -94,7 +81,7 @@ OpenGLMap: class extends Map {
 							case Float => program setUniform(key, vector _backend as Float*, vector capacity)
 							case => Debug error("Invalid Vector type in OpenGLMap use")
 						}
-					case => Debug error("Invalid object type in OpenGLMap use: %s" format(value class name))
+					case => Debug error("Invalid object type in OpenGLMap useProgram: %s" format(value class name))
 				}
 		}
 		this apply(action)
@@ -102,23 +89,12 @@ OpenGLMap: class extends Map {
 	}
 }
 
-OpenGLMapMesh: class extends OpenGLMap {
-	init: func (context: OpenGLContext) { super(This vertexSource, This fragmentSource, context) }
-	use: override func (forbiddenInput: Pointer) {
-		this add("projection", this projection)
-		super(forbiddenInput)
-	}
-	vertexSource: static String = slurp("shaders/mesh.vert")
-	fragmentSource: static String = slurp("shaders/mesh.frag")
-}
-
 OpenGLMapTransform: class extends OpenGLMap {
 	init: func (fragmentSource: String, context: OpenGLContext) { super(This vertexSource, fragmentSource, context) }
-	use: override func (forbiddenInput: Pointer) {
-		finalTransform := this projection * this view * this model
-		this add("transform", finalTransform)
-		this add("textureTransform", this textureTransform)
-		super(forbiddenInput)
+	useProgram: override func (forbiddenInput: Pointer, positionTransform: FloatTransform3D, textureTransform: FloatTransform3D) {
+		this add("transform", positionTransform)
+		this add("textureTransform", textureTransform)
+		super(forbiddenInput, positionTransform, textureTransform)
 	}
 	vertexSource: static String = slurp("shaders/transform.vert")
 }

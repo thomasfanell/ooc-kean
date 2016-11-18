@@ -9,7 +9,7 @@
 use base
 use geometry
 import egl/egl
-import GLTexture, GLContext
+import GLTexture, GLContext, GLExtensions, gles3/Gles3Debug
 
 version(!gpuOff) {
 EGLImage: class extends GLTexture {
@@ -27,14 +27,20 @@ EGLImage: class extends GLTexture {
 		this bindSibling()
 	}
 	free: override func {
-		This _eglDestroyImageKHR(this _eglDisplay, this _eglBackend)
+		GLExtensions eglDestroyImageKHR(this _eglDisplay, this _eglBackend)
 		this _backendTexture free()
 		super()
 	}
 	bindSibling: func {
+		version(debugGL) { validateStart("EGLImage eglCreateImageKHR") }
 		eglImageAttributes := [EGL_IMAGE_PRESERVED_KHR, EGL_FALSE, EGL_NONE] as Int*
-		this _eglBackend = This _eglCreateImageKHR(this _eglDisplay, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, this _nativeBuffer, eglImageAttributes)
-		This _glEGLImageTargetTexture2DOES(this _backendTexture _target, this _eglBackend)
+		this _eglBackend = GLExtensions eglCreateImageKHR(this _eglDisplay, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, this _nativeBuffer, eglImageAttributes)
+		version(debugGL) { validateEnd("EGLImage eglCreateImageKHR") }
+		if (this _eglBackend == EGL_NO_IMAGE_KHR)
+			Debug error("EGL_NO_IMAGE_KHR returned")
+		version(debugGL) { validateStart("EGLImage glEGLImageTargetTexture2DOES") }
+		GLExtensions glEGLImageTargetTexture2DOES(this _backendTexture _target, this _eglBackend)
+		version(debugGL) { validateEnd("EGLImage glEGLImageTargetTexture2DOES") }
 	}
 	generateMipmap: override func { this _backendTexture generateMipmap() }
 	bind: override func (unit: UInt) { this _backendTexture bind(unit) }
@@ -42,21 +48,8 @@ EGLImage: class extends GLTexture {
 	upload: override func (pixels: Pointer, stride: Int) { this _backendTexture upload(pixels, stride) }
 	setMagFilter: override func (interpolation: InterpolationType) { this _backendTexture setMagFilter(interpolation) }
 	setMinFilter: override func (interpolation: InterpolationType) { this _backendTexture setMinFilter(interpolation) }
-
-	_eglCreateImageKHR: static Func(Pointer, Pointer, UInt, Pointer, Int*) -> Pointer
-	_eglDestroyImageKHR: static Func(Pointer, Pointer)
-	_glEGLImageTargetTexture2DOES: static Func(UInt, Pointer)
-	_initialized: static Bool = false
-	initialize: static func {
-		This _eglCreateImageKHR = (eglGetProcAddress("eglCreateImageKHR" toCString()), null) as Func(Pointer, Pointer, UInt, Pointer, Int*) -> Pointer
-		This _eglDestroyImageKHR = (eglGetProcAddress("eglDestroyImageKHR" toCString()), null) as Func(Pointer, Pointer)
-		This _glEGLImageTargetTexture2DOES = (eglGetProcAddress("glEGLImageTargetTexture2DOES" toCString()), null) as Func(UInt, Pointer)
-		This _initialized = true
-	}
 	create: static func (type: TextureType, size: IntVector2D, nativeBuffer: Pointer, context: GLContext) -> This {
-		if (!This _initialized)
-			This initialize()
-		(type == TextureType Rgba || type == TextureType Rgb || type == TextureType Yv12) ?
+		(type == TextureType Rgba || type == TextureType Rgb || type == TextureType External) ?
 		This new(type, size, nativeBuffer, context) : null
 	}
 }

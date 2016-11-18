@@ -10,16 +10,16 @@ version(!gpuOff) {
 use base
 use geometry
 import ../egl/egl
-import ../[GLContext, GLTexture, GLVertexArrayObject]
+import ../[GLContext, GLTexture, GLVertexArrayObject, GLIndexBufferObject]
 import external/gles3
-import Gles3Debug, Gles3Fence, Gles3FramebufferObject, Gles3Quad, Gles3Renderer, Gles3ShaderProgram, Gles3Texture, Gles3VolumeTexture, Gles3VertexArrayObject
+import Gles3Debug, Gles3Fence, Gles3FramebufferObject, Gles3Quad, Gles3Renderer, Gles3ShaderProgram, Gles3Texture, Gles3VolumeTexture, Gles3VertexArrayObject, Gles3IndexBufferObject
 
 Gles3Context: class extends GLContext {
 	_eglContext: Pointer
 	_eglSurface: Pointer
 	_contextCount := static 0
 	_mutex := static Mutex new()
-	init: func
+	init: func { super() }
 	free: override func {
 		status := eglMakeCurrent(this _eglDisplay, null, null, null)
 		if (status != EGL_TRUE)
@@ -30,21 +30,26 @@ Gles3Context: class extends GLContext {
 		status = eglDestroySurface(this _eglDisplay, this _eglSurface)
 		if (status != EGL_TRUE)
 			Debug print("eglDestroySurface failed with error code %d" format(status))
-		if (This _contextCount == 1) {
-			status = eglTerminate(this _eglDisplay)
-			if (status != EGL_TRUE)
-				Debug print("eglTerminate failed with error code %d" format(status))
-		}
-		This _mutex with(|| This _contextCount -= 1)
+		This _mutex with(||
+			if (This _contextCount == 1) {
+				status = eglTerminate(this _eglDisplay)
+				if (status != EGL_TRUE)
+					Debug print("eglTerminate failed with error code %d" format(status))
+			}
+			This _contextCount -= 1
+		)
 		super()
 	}
-	makeCurrent: override func -> Bool {
-		result := eglMakeCurrent(this _eglDisplay, this _eglSurface, this _eglSurface, this _eglContext) != 0
-		version(debugGL) {
-			if (result)
-				printVersionInfo()
-		}
-		result
+	makeCurrent: override func -> Bool { eglMakeCurrent(this _eglDisplay, this _eglSurface, this _eglSurface, this _eglContext) != 0 }
+	printExtensions: func {
+		extensions := eglQueryString(this _eglDisplay, EGL_EXTENSIONS) as CString
+		extensionsString := String new(extensions, extensions length())
+		array := extensionsString split(' ')
+		extensionsString free()
+		Debug print("EGL Extensions: ")
+		for (i in 0 .. array count)
+			Debug print(array[i])
+		array free()
 	}
 	swapBuffers: override func { eglSwapBuffers(this _eglDisplay, this _eglSurface) }
 	_chooseConfig: func (configAttribs: Int*) -> Pointer {
@@ -76,15 +81,15 @@ Gles3Context: class extends GLContext {
 		This _mutex with(|| This _contextCount += 1)
 		this _eglContext = eglCreateContext(this _eglDisplay, config, shared, contextAttribs)
 		if (this _eglContext == null) {
-			"Failed to create OpenGL ES 3 context, trying with OpenGL ES 2 instead" println()
+			Debug print("Failed to create OpenGL ES 3 context, trying with OpenGL ES 2 instead")
 			contextAttribs = [
 				EGL_CONTEXT_CLIENT_VERSION, 2,
 				EGL_NONE] as Int*
 			this _eglContext = eglCreateContext(this _eglDisplay, config, shared, contextAttribs)
 			if (this _eglContext == null)
-				raise("Failed to create OpenGL ES 3 or OpenGL ES 2 context")
+				Debug error("Failed to create OpenGL ES 3 or OpenGL ES 2 context")
 			else
-				"WARNING: Using OpenGL ES 2" println()
+				Debug print("WARNING: Using OpenGL ES 2")
 		}
 	}
 	_generate: func (display: Pointer, nativeBackend: Long, sharedContext: This) -> Bool {
@@ -114,7 +119,7 @@ Gles3Context: class extends GLContext {
 	_generate: func ~pbuffer (sharedContext: This) -> Bool {
 		this _eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY)
 		if (this _eglDisplay == null)
-			raise("Failed to get default display")
+			Debug error("Failed to get default display")
 		eglInitialize(this _eglDisplay, null, null)
 		eglBindAPI(EGL_OPENGL_ES_API)
 
@@ -127,7 +132,7 @@ Gles3Context: class extends GLContext {
 			EGL_ALPHA_SIZE, 8,
 			EGL_SAMPLES, 0,
 			EGL_DEPTH_SIZE, 0,
-			EGL_BIND_TO_TEXTURE_RGBA, EGL_TRUE,
+			EGL_BIND_TO_TEXTURE_RGBA, EGL_DONT_CARE,
 			EGL_NONE] as Int*
 		chosenConfig: Pointer = this _chooseConfig(configAttribs)
 
@@ -154,26 +159,31 @@ Gles3Context: class extends GLContext {
 		glViewport(viewport left, viewport top, viewport width, viewport height)
 		version(debugGL) { validateEnd("Context setViewport") }
 	}
-	enableBlend: override func (on: Bool) {
-		version(debugGL) { validateStart("Context enableBlend") }
-		if (on)
-			glEnable(GL_BLEND)
-		else
-			glDisable(GL_BLEND)
-		version(debugGL) { validateEnd("Context enableBlend") }
+	disableBlend: override func {
+		version(debugGL) { validateStart("Context disableBlend") }
+		glDisable(GL_BLEND)
+		version(debugGL) { validateEnd("Context disableBlend") }
 	}
-	blend: override func ~constant (factor: Float) {
-		version(debugGL) { validateStart("Context blend~constant") }
+	blendAdd: override func {
+		version(debugGL) { validateStart("Context blendAdd") }
 		glEnable(GL_BLEND)
-		glBlendColor(factor, factor, factor, factor)
-		glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
-		version(debugGL) { validateEnd("Context blend~constant") }
+		glBlendEquation(GL_FUNC_ADD)
+		glBlendFunc(GL_ONE, GL_ONE)
+		version(debugGL) { validateEnd("Context blendAdd") }
 	}
-	blend: override func ~alphaMonochrome {
-		version(debugGL) { validateStart("Context blend~alphaMonochrome") }
+	blendWhite: override func {
+		version(debugGL) { validateStart("Context blendWhite") }
 		glEnable(GL_BLEND)
+		glBlendEquation(GL_FUNC_ADD)
 		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR)
-		version(debugGL) { validateEnd("Context blend~alphaMonochrome") }
+		version(debugGL) { validateEnd("Context blendWhite") }
+	}
+	blendAlpha: override func {
+		version(debugGL) { validateStart("Context blendAlpha") }
+		glEnable(GL_BLEND)
+		glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD)
+		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE)
+		version(debugGL) { validateEnd("Context blendAlpha") }
 	}
 	createQuad: override func -> Gles3Quad {
 		result := Gles3Quad new()
@@ -203,6 +213,9 @@ Gles3Context: class extends GLContext {
 	createVertexArrayObject: override func (vertices: FloatPoint3D[], textureCoordinates: FloatPoint2D[]) -> GLVertexArrayObject {
 		Gles3VertexArrayObject new(vertices, textureCoordinates)
 	}
+	createIndexBufferObject: override func (vertices: FloatPoint3D[], textureCoordinates: FloatPoint2D[], indices: IntPoint3D[]) -> GLIndexBufferObject {
+		Gles3IndexBufferObject new(vertices, textureCoordinates, indices)
+	}
 	create: static func ~shared (display: Pointer, nativeBackend: Long, sharedContext: This = null) -> This {
 		version(debugGL) { Debug print("Creating OpenGL Context") }
 		result := This new()
@@ -214,4 +227,6 @@ Gles3Context: class extends GLContext {
 		result _generate(sharedContext) ? result : null
 	}
 }
+
+GlobalCleanup register(|| Gles3Context _mutex free(), 10)
 }

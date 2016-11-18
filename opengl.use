@@ -11,14 +11,14 @@ Imports: OpenGLRgb
 Imports: OpenGLRgba
 Imports: OpenGLMonochrome
 Imports: OpenGLUv
-Imports: OpenGLCanvas
-Imports: OpenGLSurface
 Imports: OpenGLMap
 Imports: OpenGLContext
 Imports: OpenGLVolumeMonochrome
-Imports: OpenGLWindow
+Imports: OpenGLPromise
 Imports: AndroidContext
+Imports: YuvExtensionContext
 Imports: EGLRgba
+Imports: EGLYuv
 Imports: GraphicBuffer
 Imports: GraphicBufferYuv420Semiplanar
 version (linux || apple || android)

@@ -95,7 +95,6 @@ Pointer: cover from Void* {
 
 Bool: cover from bool {
 	toString: func -> String { this ? "true" : "false" }
-	toText: func -> Text { this ? t"true" : t"false" }
 }
 
 Closure: cover {
@@ -125,5 +124,8 @@ Closure: cover {
 			this thunk = null
 		}
 		result
+	}
+	fromPointer: static func (funcPtr: Pointer, owner: Owner = Owner Sender) -> This {
+		(funcPtr, null, owner) as This
 	}
 }

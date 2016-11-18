@@ -11,19 +11,19 @@ use draw
 use draw-gpu
 use base
 import backend/GLTexture
-import OpenGLCanvas, OpenGLPacked, OpenGLContext, OpenGLMap
+import OpenGLPacked, OpenGLContext, OpenGLMap
 
 version(!gpuOff) {
 OpenGLUv: class extends OpenGLPacked {
-	init: func ~fromPixels (size: IntVector2D, stride: UInt, data: Pointer, coordinateSystem: CoordinateSystem, context: OpenGLContext) {
-		super(context _backend createTexture(TextureType Uv, size, stride, data), This channelCount, context, coordinateSystem)
+	init: func ~fromPixels (size: IntVector2D, stride: UInt, data: Pointer, context: OpenGLContext) {
+		super(context _backend createTexture(TextureType Uv, size, stride, data), This channelCount, context)
 	}
 	init: func (size: IntVector2D, context: OpenGLContext) {
-		this init(size, size x * This channelCount, null, CoordinateSystem YUpward, context)
+		this init(size, size x * This channelCount, null, context)
 	}
 	init: func ~fromTexture (texture: GLTexture, context: OpenGLContext) { super(texture, This channelCount, context) }
 	init: func ~fromRaster (rasterImage: RasterUv, context: OpenGLContext) {
-		this init(rasterImage size, rasterImage stride, rasterImage buffer pointer, rasterImage coordinateSystem, context)
+		this init(rasterImage size, rasterImage stride, rasterImage buffer pointer, context)
 	}
 	toRasterDefault: override func -> RasterImage {
 		result := RasterUv new(this size)
@@ -33,9 +33,7 @@ OpenGLUv: class extends OpenGLPacked {
 	toRasterDefault: override func ~target (target: RasterImage) {
 		packed := this context createRgba(IntVector2D new(this size x / 2, this size y))
 		this context packToRgba(this, packed, IntBox2D new(packed size))
-		buffer := (target as RasterUv) buffer
-		(packed canvas as OpenGLCanvas) readPixels(buffer)
-		packed free()
+		(packed as OpenGLPacked) readPixels(target as RasterPacked) . free()
 	}
 	create: override func (size: IntVector2D) -> This { this context createUv(size) as This }
 	channelCount: static Int = 2

@@ -16,31 +16,6 @@ import StbImage
 import Image
 import Color
 import Pen
-import Canvas, RasterCanvas
-
-RasterUvCanvas: class extends RasterPackedCanvas {
-	target ::= this _target as RasterUv
-	init: func (image: RasterUv) { super(image) }
-	_drawPoint: override func (x, y: Int, pen: Pen) {
-		position := this _map(IntPoint2D new(x, y))
-		if (this target isValidIn(position x, position y))
-			this target[position x, position y] = this target[position x, position y] blend(pen alphaAsFloat, pen color toUv())
-	}
-	_draw: override func (image: Image, source, destination: IntBox2D, interpolate: Bool) {
-		uv: RasterUv = null
-		if (image == null)
-			Debug error("Null image in RasterUvCanvas draw")
-		else if (image instanceOf(RasterUv))
-			uv = image as RasterUv
-		else if (image instanceOf(RasterImage))
-			uv = RasterUv convertFrom(image as RasterImage)
-		else
-			Debug error("Unsupported image type in RasterUvCanvas draw")
-		this _resizePacked(uv buffer pointer as ColorUv*, uv, source, destination, interpolate)
-		if (uv != image)
-			uv referenceCount decrease()
-	}
-}
 
 RasterUv: class extends RasterPacked {
 	bytesPerPixel ::= 2
@@ -48,12 +23,45 @@ RasterUv: class extends RasterPacked {
 	init: func ~allocateStride (size: IntVector2D, stride: UInt) { super(size, stride) }
 	init: func ~fromByteBufferStride (buffer: ByteBuffer, size: IntVector2D, stride: UInt) { super(buffer, size, stride) }
 	init: func ~fromByteBuffer (buffer: ByteBuffer, size: IntVector2D) { this init(buffer, size, this bytesPerPixel * size x) }
-	init: func ~fromRasterUv (original: This) { super(original) }
-	init: func ~fromRasterImage (original: RasterImage) { super(original) }
 	create: override func (size: IntVector2D) -> Image { This new(size) }
-	copy: override func -> This { This new(this) }
+	_drawPoint: override func (x, y: Int, pen: Pen) {
+		position := this _map(IntPoint2D new(x, y))
+		if (this isValidIn(position x, position y))
+			this[position x, position y] = ColorUv mix(this[position x, position y], pen color toUv(), pen alphaAsFloat)
+	}
+	_draw: override func (image: Image, source, destination: IntBox2D, normalizedTransform: FloatTransform3D, interpolate, flipX, flipY: Bool) {
+		uv: This = null
+		if (image == null)
+			Debug error("Null image in RasterUv draw")
+		else if (image instanceOf(This))
+			uv = image as This
+		else if (image instanceOf(RasterImage))
+			uv = This convertFrom(image as RasterImage)
+		else
+			Debug error("Unsupported image type in RasterUv draw")
+		this _resizePacked(uv buffer pointer as ColorUv*, uv, source, destination, normalizedTransform, interpolate, flipX, flipY, ColorUv new())
+		if (uv != image)
+			uv referenceCount decrease()
+	}
+	fill: override func (color: ColorRgba) {
+		colorUv := ColorUv new(color r, color g)
+		if (colorUv u == colorUv v)
+			this buffer memset(colorUv u)
+		else {
+			sizeY := this size y
+			sizeX := this size x
+			thisBuffer := this buffer pointer as ColorUv*
+			thisStride := this stride / this bytesPerPixel
+			for (y in 0 .. sizeY)
+				for (x in 0 .. sizeX)
+					thisBuffer[x + y * thisStride] = colorUv
+		}
+	}
+	copy: override func -> This { This new(this buffer copy(), this size, this stride) }
 	apply: override func ~rgb (action: Func(ColorRgb)) {
-		this apply(ColorConvert fromYuv(action))
+		convert := ColorConvert fromYuv(action)
+		this apply(convert)
+		(convert as Closure) free()
 	}
 	apply: override func ~yuv (action: Func(ColorYuv)) {
 		uvRow := this buffer pointer
@@ -62,6 +70,7 @@ RasterUv: class extends RasterPacked {
 		vSource := vRow
 		width := this size x
 		height := this size y
+		thisStride := this stride
 
 		for (y in 0 .. height) {
 			for (x in 0 .. width) {
@@ -69,17 +78,17 @@ RasterUv: class extends RasterPacked {
 				uSource += 2
 				vSource += 2
 			}
-			uvRow += this stride
+			uvRow += thisStride
 			uSource = uvRow
 			vSource = uvRow + 1
 		}
 	}
 	apply: override func ~monochrome (action: Func(ColorMonochrome)) {
-		this apply(ColorConvert fromYuv(action))
+		convert := ColorConvert fromYuv(action)
+		this apply(convert)
+		(convert as Closure) free()
 	}
-	resizeTo: override func (size: IntVector2D) -> This {
-		this resizeTo(size, true) as This
-	}
+	resizeTo: override func (size: IntVector2D) -> This { this resizeTo(size, true) as This }
 	resizeTo: override func ~withMethod (size: IntVector2D, interpolate: Bool) -> This {
 		result := This new(size)
 		DrawState new(result) setInputImage(this) setInterpolate(interpolate) draw()
@@ -94,17 +103,23 @@ RasterUv: class extends RasterPacked {
 			result = this distance(converted)
 			converted referenceCount decrease()
 		} else {
-			for (y in 0 .. this size y)
-				for (x in 0 .. this size x) {
-					c := this[x, y]
-					o := (other as This)[x, y]
+			sizeX := this size x
+			sizeY := this size y
+			thisBuffer := this buffer _pointer as ColorUv*
+			otherBuffer := (other as This) buffer _pointer as ColorUv*
+			thisStride := this stride / this bytesPerPixel
+			otherStride := (other as This) stride / this bytesPerPixel
+			for (y in 0 .. sizeY)
+				for (x in 0 .. sizeX) {
+					c := thisBuffer[x + y * thisStride]
+					o := otherBuffer[x + y * otherStride]
 					if (c distance(o) > 0) {
 						maximum := o
 						minimum := o
-						for (otherY in 0 maximum(y - this distanceRadius) .. (y + 1 + this distanceRadius) minimum(this size y))
-							for (otherX in 0 maximum(x - this distanceRadius) .. (x + 1 + this distanceRadius) minimum(this size x))
+						for (otherY in 0 maximum(y - this distanceRadius) .. (y + 1 + this distanceRadius) minimum(sizeY))
+							for (otherX in 0 maximum(x - this distanceRadius) .. (x + 1 + this distanceRadius) minimum(sizeX))
 								if (otherX != x || otherY != y) {
-									pixel := (other as This)[otherX, otherY]
+									pixel := otherBuffer[otherX + otherY * otherStride]
 									if (maximum u < pixel u)
 										maximum u = pixel u
 									else if (minimum u > pixel u)
@@ -126,23 +141,20 @@ RasterUv: class extends RasterPacked {
 						result += (distance) sqrt() / 3
 					}
 				}
-			result /= ((this size x squared + this size y squared) as Float sqrt())
+			result /= this size norm
 		}
 		result
 	}
-	_createCanvas: override func -> Canvas { RasterUvCanvas new(this) }
-
 	operator [] (x, y: Int) -> ColorUv { this isValidIn(x, y) ? ((this buffer pointer + y * this stride) as ColorUv* + x)@ : ColorUv new(0, 0) }
 	operator []= (x, y: Int, value: ColorUv) { ((this buffer pointer + y * this stride) as ColorUv* + x)@ = value }
-
 	save: override func (filename: String) -> Int {
 		rgb := RasterRgb convertFrom(this)
 		result := rgb save(filename)
 		rgb referenceCount decrease()
 		result
 	}
-	open: static func (filename: String, coordinateSystem := CoordinateSystem Default) -> This {
-		rasterRgb := RasterRgb open(filename, coordinateSystem)
+	open: static func (filename: String) -> This {
+		rasterRgb := RasterRgb open(filename)
 		result := This convertFrom(rasterRgb)
 		rasterRgb referenceCount decrease()
 		result
@@ -152,7 +164,7 @@ RasterUv: class extends RasterPacked {
 		if (original instanceOf(This))
 			result = (original as This) copy()
 		else {
-			result = This new(original)
+			result = This new(original size)
 			row := result buffer pointer
 			rowLength := result size x
 			rowEnd := row as ColorUv* + rowLength

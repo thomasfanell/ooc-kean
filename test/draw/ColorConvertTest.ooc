@@ -44,6 +44,16 @@ ColorConvertTest: class extends Fixture {
 			expect(color toRgb() equals(ColorRgb new(78, 99, 118)), is true)
 			expect(color toRgba() equals(ColorRgba new(78, 99, 118, 255)), is true)
 		})
+		this add("RGBA from text", func {
+			color := ColorRgba fromString("79")
+			expect(color equals(ColorRgba new(79, 79, 79, 255)))
+			color = ColorRgba fromString("135,221")
+			expect(color equals(ColorRgba new(135, 135, 135, 221)))
+			color = ColorRgba fromString("78,56,34")
+			expect(color equals(ColorRgba new(78, 56, 34, 255)))
+			color = ColorRgba fromString("12,34,56,78")
+			expect(color equals(ColorRgba new(12, 34, 56, 78)))
+		})
 	}
 }
 

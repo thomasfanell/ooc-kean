@@ -84,8 +84,8 @@ FloatBox2D: cover {
 	intersection: func (other: This) -> This {
 		left := this left maximum(other left)
 		top := this top maximum(other top)
-		width := 0 maximum(this right minimum(other right) - left)
-		height := 0 maximum(this bottom minimum(other bottom) - top)
+		width := 0.f maximum(this right minimum(other right) - left)
+		height := 0.f maximum(this bottom minimum(other bottom) - top)
 		This new(left, top, width, height)
 	}
 	union: func ~box (other: This) -> This { // Rock bug: Union without suffix cannot be used because the C name conflicts with keyword "union"
@@ -118,12 +118,11 @@ FloatBox2D: cover {
 	ceiling: func -> This { This new(this leftTop ceiling(), this size ceiling()) }
 	floor: func -> This { This new(this leftTop floor(), this size floor()) }
 	adaptTo: func (other: This, weight: Float) -> This {
-		newCenter := FloatPoint2D linearInterpolation(this center, other center, weight)
-		newSize := FloatVector2D linearInterpolation(this size, other size, weight)
+		newCenter := FloatPoint2D mix(this center, other center, weight)
+		newSize := FloatVector2D mix(this size, other size, weight)
 		This createAround(newCenter, newSize)
 	}
-	toString: func -> String { "#{this leftTop toString()}, #{this size toString()}" }
-	toText: func -> Text { this leftTop toText() + t", " + this size toText() }
+	toString: func (decimals := 2) -> String { (this leftTop toString(decimals) >> ", ") & this size toString(decimals) }
 	toIntBox2D: func -> IntBox2D { IntBox2D new(this left, this top, this width, this height) }
 
 	operator + (other: This) -> This {
@@ -149,7 +148,7 @@ FloatBox2D: cover {
 	operator / (other: FloatVector2D) -> This { This new(this leftTop / other, this size / other) }
 	operator - (other: FloatVector2D) -> This { This new(this leftTop, this size - other) }
 
-	parse: static func (input: Text) -> This {
+	parse: static func (input: String) -> This {
 		parts := input split(',')
 		result := This new(parts[0] toFloat(), parts[1] toFloat(), parts[2] toFloat(), parts[3] toFloat())
 		parts free()
@@ -186,11 +185,11 @@ FloatBox2D: cover {
 		}
 		This new(xMinimum, yMinimum, xMaximum - xMinimum, yMaximum - yMinimum)
 	}
-	linearInterpolation: static func (a, b: This, ratio: Float) -> This {
-		This new(FloatPoint2D linearInterpolation(a leftTop, b leftTop, ratio), FloatVector2D linearInterpolation(a size, b size, ratio))
+	mix: static func (a, b: This, ratio: Float) -> This {
+		This new(FloatPoint2D mix(a leftTop, b leftTop, ratio), FloatVector2D mix(a size, b size, ratio))
 	}
 }
 
 extend Cell<FloatBox2D> {
-	toText: func ~floatbox2d -> Text { (this val as FloatBox2D) toText() }
+	toString: func ~floatbox2d -> String { (this val as FloatBox2D) toString() }
 }

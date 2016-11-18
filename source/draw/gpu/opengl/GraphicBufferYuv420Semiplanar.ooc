@@ -9,16 +9,14 @@
 use draw
 use geometry
 use base
-use collections
 use draw-gpu
-import GraphicBuffer, OpenGLContext, EGLRgba
+use concurrent
+import GraphicBuffer
 
-version(!gpuOff) {
 GraphicBufferYuv420Semiplanar: class extends RasterYuv420Semiplanar {
 	_buffer: GraphicBuffer
 	_stride: Int
 	_uvOffset: Int
-	_rgba: EGLRgba = null
 	buffer ::= this _buffer
 	stride ::= this _stride
 	uvOffset ::= this _uvOffset
@@ -30,56 +28,18 @@ GraphicBufferYuv420Semiplanar: class extends RasterYuv420Semiplanar {
 		super(ByteBuffer new(pointer, length), size, _stride, _uvOffset)
 	}
 	free: override func {
-		if (this _rgba != null)
-			This _recycle(this _rgba)
 		this _buffer free()
 		super()
 	}
-	toRgba: func (context: OpenGLContext) -> GpuImage {
-		if (this _rgba == null)
-			this _rgba = This _search(this _buffer)
-		if (this _rgba == null) {
-			padding := this _uvOffset - this _stride * this _size y
-			extraRows := padding align(this _stride) / this _stride
-			height := this _size y + this _size y / 2 + extraRows
-			width := this _stride / 4
-			rgbaBuffer := this buffer shallowCopy(IntVector2D new(width, height), width, GraphicBufferFormat Rgba8888, GraphicBufferUsage Texture | GraphicBufferUsage RenderTarget)
-			this _rgba = EGLRgba new(rgbaBuffer, context)
-			this _rgba referenceCount increase()
-		}
-		this _rgba _coordinateSystem = this coordinateSystem
-		this _rgba referenceCount increase()
-		this _rgba
-	}
-	_bin := static VectorList<EGLRgba> new()
-	_mutex := static Mutex new()
-	_binSize: static Int = 100
-	_recycle: static func (image: EGLRgba) {
-		This _mutex lock()
-		This _bin add(image)
-		if (This _bin count > This _binSize)
-			This _bin remove(0) referenceCount decrease()
-		This _mutex unlock()
-	}
-	_search: static func (buffer: GraphicBuffer) -> EGLRgba {
-		This _mutex lock()
-		result: EGLRgba = null
-		for (i in 0 .. This _bin count) {
-			if (This _bin[i] buffer _handle == buffer _handle) {
-				result = This _bin remove(i)
-				break
-			}
-		}
-		This _mutex unlock()
+	copy: override func -> RasterYuv420Semiplanar {
+		this buffer lock(GraphicBufferUsage ReadOften)
+		result := super()
+		this buffer unlock()
 		result
 	}
-	free: static func ~all {
-		This _mutex lock()
-		while (!This _bin empty)
-			This _bin remove() referenceCount decrease()
-		This _mutex unlock()
+	copyFrom: override func (source: RasterYuv420Semiplanar) {
+		this _buffer lock(GraphicBufferUsage WriteOften)
+		super(source)
+		this _buffer unlock()
 	}
-}
-
-GlobalCleanup register(|| GraphicBufferYuv420Semiplanar free~all())
 }

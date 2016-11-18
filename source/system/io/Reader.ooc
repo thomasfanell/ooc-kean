@@ -30,6 +30,7 @@ Reader: abstract class {
 			readBytes := this read(in)
 			out append(in, readBytes)
 		}
+		in free()
 		out toString()
 	}
 	readUntil: func (end: Char) -> String {
@@ -120,5 +121,4 @@ Reader: abstract class {
 	seek: abstract func (offset: Long, mode: SeekMode) -> Bool
 	reset: func (marker: Long) { this seek(marker, SeekMode SET) }
 	skip: func (offset: Int) { this seek(offset, SeekMode CUR) }
-	close: abstract func
 }

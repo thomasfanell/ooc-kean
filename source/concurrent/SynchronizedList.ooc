@@ -6,6 +6,8 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
+ use base
+
 SynchronizedList: class <T> extends List<T> {
 	_mutex := Mutex new()
 	_backend: VectorList<T>
@@ -55,6 +57,11 @@ SynchronizedList: class <T> extends List<T> {
 		this _backend removeAt(index)
 		this _mutex unlock()
 	}
+	removeAt: override func ~indices (start, end: Int) {
+		this _mutex lock()
+		this _backend removeAt(start, end)
+		this _mutex unlock()
+	}
 	clear: override func {
 		this _mutex lock()
 		this _backend clear()
@@ -72,9 +79,9 @@ SynchronizedList: class <T> extends List<T> {
 		this _mutex unlock()
 		result
 	}
-	sort: override func (greaterThan: Func (T, T) -> Bool) {
+	sort: override func (isLess: Func (T, T) -> Bool) {
 		this _mutex lock()
-		this _backend sort(greaterThan)
+		this _backend sort(isLess)
 		this _mutex unlock()
 	}
 	copy: override func -> This<T> {

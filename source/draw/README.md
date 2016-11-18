@@ -3,9 +3,6 @@
 ## Image
 An image is responsible for storing an array of pixels in 2 or 3 dimensions on CPU or GPU.
 
-## Canvas
-An abstraction layer for drawing that is responsible for portability between underlaying versions of OpenGL using class inheritance.
-
 ## Target
 The target is the image being drawn to. The same image cannot be both input and output to the same draw call because of hardware limitations on some graphics cards.
 
@@ -19,6 +16,11 @@ The destination is similar to the viewport by defining where to draw. The differ
 
 ## Transform
 Transform is the inverse camera matrix applied after the destination scaling.
+
+## TargetTransform
+TargetTransform can be used to translate and scale in image space. The difference from translating in camera space is that no parallax is applied because vertices at all depths move equally in two dimensions. The center point of TargetTransform defines the center of perspective where no geometry is stretched from the planar projection.
+
+This works as if the projection was applied after depth division by multiplying the projection matrix with a normalized translation. If we want to add a constant to something that will later be divided by depth then we simply add the constant multiplied by depth. For a perspective projection matrix, the translation will be multiplied by -Z and thereby tilt the Z axis. For an orthographic projection matrix, the translation will be multiplied by 1 as usual.
 
 ## Source
 The source is a subregion of the input image affecting generation of texture coordinates in the shader.
@@ -41,7 +43,7 @@ Transforms go from zero in the center and increase with either pixels or pixels 
 * **Normalized transforms** start from the center of the image and go from (-1, -1) in the top left corner to (+1, +1) in the bottom right corner. This allows using the same coordinates for multiple image resolutions. The disadvantage is that it does not preserve aspect ratio when rotating since it treats all images as squares when not knowing their size. This is the normalized version of reference coordinates.
 
 # DrawState
-Using `DrawState` you can draw things without having to call the canvas directly.
+Using `DrawState` you can draw things without having to call the image directly.
 This is convenient if you have a lot of things to draw that have settings in common.
 
 ## Availability of settings
@@ -53,12 +55,14 @@ Using destination or transform on the CPU would require a rewrite of legacy draw
 | inputImage | X | X | X |
 | viewport | X | X |  |
 | source | X | X |  |
+| flipSourceX | X | X |  |
+| flipSourceY | X | X |  |
 | destination | X |  |  |
 | transform | X |  |  |
+| targetTransform | X |  |  |
 | focalLength | X |  |  |
 | map | X |  |  |
 | mesh | X |  |  |
-| opacity | X |  |  |
 | blendMode | X |  |  |
 | interpolate |  | X |  |
 | origin |  |  | X |

@@ -34,7 +34,7 @@ CircularQueueTest: class extends Fixture {
 			expect(queue dequeue(0), is equal to(2))
 			expect(queue dequeue(0), is equal to(3))
 			expect(queue dequeue(0), is equal to(4))
-			expect(queue empty, is equal to(true))
+			expect(queue empty, is true)
 			queue free()
 		})
 		this add("with class", func {
@@ -51,9 +51,25 @@ CircularQueueTest: class extends Fixture {
 			object free()
 			object = queue dequeue(null)
 			expect(object content, is equal to(3))
-			object free()
-			queue free()
+			(object, queue) free()
 			expect(MyClass instanceCount, is equal to(initialCount))
+		})
+		this add("First/Last properties", func {
+			queue := CircularQueue<Int> new(3)
+			queue enqueue(1) . enqueue(2) . enqueue(3)
+			expect(queue first, is equal to(1))
+			expect(queue last, is equal to(3))
+			queue first = 17
+			queue last = 19
+			expect(queue first, is equal to(17))
+			expect(queue last, is equal to(19))
+			queue enqueue(10)
+			expect(queue first, is equal to(2))
+			expect(queue last, is equal to(10))
+			queue enqueue(15)
+			expect(queue first, is equal to(19))
+			expect(queue last, is equal to(15))
+			queue free()
 		})
 	}
 }

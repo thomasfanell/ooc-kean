@@ -16,10 +16,12 @@ List: abstract class <T> {
 	remove: abstract func ~last -> T
 	remove: abstract func ~atIndex (index: Int) -> T
 	removeAt: abstract func (index: Int)
+	removeAt: func ~range (range: Range) { this removeAt(range min, range max) }
+	removeAt: abstract func ~indices (start, end: Int)
 	clear: abstract func
 	reverse: abstract func -> This<T>
 	search: abstract func (matches: Func (T) -> Bool) -> Int
-	sort: abstract func (greaterThan: Func (T, T) -> Bool)
+	sort: abstract func (isLess: Func (T, T) -> Bool)
 	copy: abstract func -> This<T>
 	apply: abstract func (function: Func(T))
 	modify: abstract func (function: Func(T) -> T)

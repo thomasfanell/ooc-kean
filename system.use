@@ -17,14 +17,11 @@ Imports: Env
 Imports: Format
 Imports: Iterators
 Imports: Memory
-Imports: Mutex
 Imports: Numbers
 Imports: math
 Imports: Owner
 Imports: OwnedBuffer
 Imports: System
-Imports: TextBuffer
-Imports: Text
 Imports: Time
 Imports: VarArgs
 Imports: external/errno

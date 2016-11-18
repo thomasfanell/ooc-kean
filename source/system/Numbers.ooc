@@ -20,12 +20,6 @@ UINT64_MAX: extern static Long
 LLong: cover from signed long long {
 	toString: func -> String { "%lld" formatLLong(this as LLong) }
 	toHexString: func -> String { "%llx" formatLLong(this as LLong) }
-	toText: func -> Text {
-		string := this toString()
-		result := Text new(string) copy()
-		string free()
-		result
-	}
 	in: func (range: Range) -> Bool {
 		this >= range min && this < range max
 	}
@@ -79,12 +73,6 @@ UInt: cover from uint32_t extends ULLong {
 	maximumValue ::= static UINT32_MAX
 	minimumValue ::= static 0
 	toString: func -> String { "%u" formatUInt(this) }
-	toText: func -> Text {
-		string := this toString()
-		result := Text new(string) copy()
-		string free()
-		result
-	}
 }
 
 UShort: cover from uint16_t extends ULLong {
@@ -105,13 +93,10 @@ DBL_EPSILON: extern static Double
 
 LDouble: cover from long double {
 	isNumber ::= this == this
-	toString: func -> String {
-		"%.2f" formatDouble(this)
-	}
-	toText: func -> Text {
-		string := this toString()
-		result := Text new(string) copy()
-		string free()
+	toString: func (decimals := 2) -> String {
+		formatting := ("%." & decimals toString() & "f")
+		result := formatting formatDouble(this)
+		formatting free()
 		result
 	}
 	in: func (range: Range) -> Bool {
@@ -121,15 +106,21 @@ LDouble: cover from long double {
 
 Double: cover from double extends LDouble {
 	isNumber ::= this == this
-	toString: func -> String {
-		"%.2f" formatDouble(this)
+	toString: func (decimals := 2) -> String {
+		formatting := ("%." & decimals toString() & "f")
+		result := formatting formatDouble(this)
+		formatting free()
+		result
 	}
 }
 
 Float: cover from float extends LDouble {
 	isNumber ::= this == this
-	toString: func -> String {
-		"%.2f" formatFloat(this)
+	toString: func (decimals := 2) -> String {
+		formatting := ("%." & decimals toString() & "f")
+		result := formatting formatFloat(this)
+		formatting free()
+		result
 	}
 }
 
@@ -149,11 +140,5 @@ Range: cover {
 	}
 	toString: func -> String {
 		"%d, %d" format(this min, this max)
-	}
-	toText: func -> Text {
-		string := this toString()
-		result := Text new(string) copy()
-		string free()
-		result
 	}
 }

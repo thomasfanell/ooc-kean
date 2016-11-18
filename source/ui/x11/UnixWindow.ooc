@@ -44,28 +44,35 @@ UnixWindowBase: class extends DisplayWindow {
 }
 version(!gpuOff) {
 UnixWindow: class extends UnixWindowBase {
-	_openGLWindow: OpenGLWindow
-	context ::= this _openGLWindow context
+	_context: GpuContext
+	context ::= this _context as OpenGLContext
 	init: func (size: IntVector2D, title: String) {
 		super(size, title)
-		this _openGLWindow = OpenGLWindow new(this _xWindow size, this _xWindow display, this _xWindow backend)
+		this _context = OpenGLContext new(this _xWindow display, this _xWindow backend)
 	}
 	free: override func {
-		this _openGLWindow free()
+		this _context free()
 		super()
 	}
 	draw: override func (image: Image) {
-		map := this _openGLWindow _getDefaultMap(image)
+		map: Map
+		match (image class) {
+			case GpuYuv420Semiplanar => map = this context _yuvSemiplanarToRgba
+			case RasterYuv420Semiplanar => map = this context _yuvSemiplanarToRgba
+			case OpenGLMonochrome => map = this context _monochromeToRgba
+			case RasterMonochrome => map = this context _monochromeToRgba
+			case => map = this context defaultMap
+		}
 		tempImageA: GpuImage = null
 		tempImageB: GpuImage = null
 		match (image) {
 			case (matchedImage: RasterYuv420Semiplanar) =>
-				tempImageA = this _openGLWindow context createImage(matchedImage y)
-				tempImageB = this _openGLWindow context createImage(matchedImage uv)
+				tempImageA = this context createImage(matchedImage y)
+				tempImageB = this context createImage(matchedImage uv)
 				map add("texture0", tempImageA)
 				map add("texture1", tempImageB)
 			case (matchedImage: RasterImage) =>
-				tempImageA = this _openGLWindow context createImage(matchedImage)
+				tempImageA = this context createImage(matchedImage)
 				map add("texture0", tempImageA)
 			case (matchedImage: GpuYuv420Semiplanar) =>
 				map add("texture0", matchedImage y)
@@ -73,25 +80,16 @@ UnixWindow: class extends UnixWindowBase {
 			case (matchedImage: GpuImage) =>
 				map add("texture0", matchedImage)
 		}
-		sourceSize := image size toFloatVector2D()
-		map textureTransform = GpuCanvas _createTextureTransform(image size, IntBox2D new(image size))
-		map model = FloatTransform3D createScaling(sourceSize x / 2.0f, sourceSize y / 2.0f, 0.0f)
-		map view = this _openGLWindow _createView(sourceSize, FloatTransform3D identity)
-		map projection = this _openGLWindow _createProjection(sourceSize, 0.0f)
-		map use(null)
-		this _openGLWindow _bind()
-		this _openGLWindow context backend setViewport(IntBox2D new(image size))
-		this _openGLWindow context backend enableBlend(false)
-		this _openGLWindow context drawQuad()
-		this _openGLWindow _unbind()
+		map useProgram(null, FloatTransform3D identity, FloatTransform3D identity)
+		this context backend setViewport(IntBox2D new(image size))
+		this context backend disableBlend()
+		this context drawQuad()
 		if (tempImageA)
 			tempImageA free()
 		if (tempImageB)
 			tempImageB free()
 	}
-	refresh: override func {
-		this _openGLWindow refresh()
-	}
+	refresh: override func { this context update() }
 }
 }
 }

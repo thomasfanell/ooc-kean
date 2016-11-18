@@ -15,32 +15,37 @@ import StbImage
 import Image
 import Color
 import Pen
-import Canvas, RasterCanvas
-
-RasterRgbaCanvas: class extends RasterPackedCanvas {
-	target ::= this _target as RasterRgba
-	init: func (image: RasterRgba) { super(image) }
-	_drawPoint: override func (x, y: Int, pen: Pen) {
-		position := this _map(IntPoint2D new(x, y))
-		if (this target isValidIn(position x, position y))
-			this target[position x, position y] = this target[position x, position y] blend(pen alphaAsFloat, pen color)
-	}
-}
 
 RasterRgba: class extends RasterPacked {
 	bytesPerPixel ::= 4
 	init: func ~allocate (size: IntVector2D) { super~allocate(size) }
 	init: func ~allocateStride (size: IntVector2D, stride: UInt) { super(size, stride) }
-	init: func ~fromByteBufferStride (buffer: ByteBuffer, size: IntVector2D, stride: UInt, coordinateSystem := CoordinateSystem Default) { super(buffer, size, stride, coordinateSystem) }
-	init: func ~fromByteBuffer (buffer: ByteBuffer, size: IntVector2D, coordinateSystem := CoordinateSystem Default) { this init(buffer, size, this bytesPerPixel * size x, coordinateSystem) }
-	init: func ~fromRasterRgba (original: This) { super(original) }
-	init: func ~fromRasterImage (original: RasterImage) { super(original) }
+	init: func ~fromByteBufferStride (buffer: ByteBuffer, size: IntVector2D, stride: UInt) { super(buffer, size, stride) }
+	init: func ~fromByteBuffer (buffer: ByteBuffer, size: IntVector2D) { this init(buffer, size, this bytesPerPixel * size x) }
 	create: override func (size: IntVector2D) -> Image { This new(size) }
-	copy: override func -> This { This new(this) }
+	_drawPoint: override func (x, y: Int, pen: Pen) {
+		position := this _map(IntPoint2D new(x, y))
+		if (this isValidIn(position x, position y))
+			this[position x, position y] = ColorRgba mix(this[position x, position y], pen color, pen alphaAsFloat)
+	}
+	fill: override func (color: ColorRgba) {
+		sizeX := this size x
+		sizeY := this size y
+		thisBuffer := this buffer pointer as ColorRgba*
+		thisStride := this stride / this bytesPerPixel
+		for (y in 0 .. sizeY)
+			for (x in 0 .. sizeX)
+				thisBuffer[x + y * thisStride] = color
+	}
+	copy: override func -> This { This new(this buffer copy(), this size, this stride) }
 	apply: override func ~rgb (action: Func(ColorRgb)) {
-		for (row in 0 .. this size y) {
-			source := this buffer pointer + row * this stride
-			for (pixel in 0 .. this size x) {
+		sizeX := this size x
+		sizeY := this size y
+		thisBuffer := this buffer pointer
+		thisStride := this stride
+		for (row in 0 .. sizeY) {
+			source := thisBuffer + row * thisStride
+			for (pixel in 0 .. sizeX) {
 				pixelPointer := (source + pixel * this bytesPerPixel)
 				color := (pixelPointer as ColorRgb*)@
 				action(color)
@@ -66,17 +71,23 @@ RasterRgba: class extends RasterPacked {
 			result = this distance(converted)
 			converted referenceCount decrease()
 		} else {
-			for (y in 0 .. this size y)
-				for (x in 0 .. this size x) {
-					c := this[x, y]
-					o := (other as This)[x, y]
+			sizeX := this size x
+			sizeY := this size y
+			thisBuffer := this buffer _pointer as ColorRgba*
+			otherBuffer := (other as This) buffer _pointer as ColorRgba*
+			thisStride := this stride / this bytesPerPixel
+			otherStride := (other as This) stride / this bytesPerPixel
+			for (y in 0 .. sizeY)
+				for (x in 0 .. sizeX) {
+					c := thisBuffer[x + y * thisStride]
+					o := otherBuffer[x + y * otherStride]
 					if (c distance(o) > 0) {
 						maximum := o
 						minimum := o
-						for (otherY in 0 maximum(y - this distanceRadius) .. (y + 1 + this distanceRadius) minimum(this size y))
-							for (otherX in 0 maximum(x - this distanceRadius) .. (x + 1 + this distanceRadius) minimum(this size x))
+						for (otherY in 0 maximum(y - this distanceRadius) .. (y + 1 + this distanceRadius) minimum(sizeY))
+							for (otherX in 0 maximum(x - this distanceRadius) .. (x + 1 + this distanceRadius) minimum(sizeX))
 								if (otherX != x || otherY != y) {
-									pixel := (other as This)[otherX, otherY]
+									pixel := otherBuffer[otherX + otherY * otherStride]
 									if (maximum b < pixel b)
 										maximum b = pixel b
 									else if (minimum b > pixel b)
@@ -114,20 +125,16 @@ RasterRgba: class extends RasterPacked {
 						result += (distance) sqrt() / 4
 					}
 				}
-			result /= this size length
+			result /= this size norm
 		}
 		result
 	}
-	swapRedBlue: func {
-		this swapChannels(0, 2)
-	}
+	swapRedBlue: func { this swapChannels(0, 2) }
 	redBlueSwapped: func -> This {
 		result := this copy()
 		result swapRedBlue()
 		result
 	}
-	_createCanvas: override func -> Canvas { RasterRgbaCanvas new(this) }
-
 	operator [] (x, y: Int) -> ColorRgba { this isValidIn(x, y) ? ((this buffer pointer + y * this stride) as ColorRgba* + x)@ : ColorRgba new(0, 0, 0, 0) }
 	operator []= (x, y: Int, value: ColorRgba) { ((this buffer pointer + y * this stride) as ColorRgba* + x)@ = value }
 	operator [] (point: IntPoint2D) -> ColorRgba { this[point x, point y] }
@@ -150,31 +157,22 @@ RasterRgba: class extends RasterPacked {
 		)
 	}
 
-	open: static func (filename: String, coordinateSystem := CoordinateSystem Default) -> This {
+	open: static func (filename: String) -> This {
 		requiredComponents := 4
 		(buffer, size, _) := StbImage load(filename, requiredComponents)
-		result := This new(buffer, size, coordinateSystem)
-		result swapRedBlue()
-		result
+		This new(buffer, size)
 	}
 	savePacked: func (filename: String) -> Int {
-		file := File new(filename)
-		folder := file parent . mkdirs() . free()
-		file free()
+		File createParentDirectories(filename)
 		StbImage writePng(filename, this size x, this size y, this bytesPerPixel, this buffer pointer, this size x * this bytesPerPixel)
 	}
-	save: override func (filename: String) -> Int {
-		bgra := this redBlueSwapped()
-		result := bgra savePacked(filename)
-		bgra free()
-		result
-	}
+	save: override func (filename: String) -> Int { this savePacked(filename) }
 	convertFrom: static func (original: RasterImage) -> This {
 		result: This
 		if (original instanceOf(This))
 			result = (original as This) copy()
 		else {
-			result = This new(original)
+			result = This new(original size)
 			row := result buffer pointer as PtrDiff
 			rowLength := result stride
 			rowEnd := row + rowLength

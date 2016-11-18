@@ -9,18 +9,20 @@
 use base
 use geometry
 import gles3/Gles3Context
-import GLQuad, GLShaderProgram, GLTexture, GLFramebufferObject, GLFence, GLVolumeTexture, GLRenderer, GLVertexArrayObject
+import GLQuad, GLShaderProgram, GLTexture, GLFramebufferObject, GLFence, GLVolumeTexture, GLRenderer, GLVertexArrayObject, GLExtensions, GLIndexBufferObject
 
 version(!gpuOff) {
 GLContext: abstract class {
 	_eglDisplay: Pointer
 
+	init: func { GLExtensions initialize() }
 	makeCurrent: abstract func -> Bool
 	swapBuffers: abstract func
 	setViewport: abstract func (viewport: IntBox2D)
-	enableBlend: abstract func (on: Bool)
-	blend: abstract func ~constant (factor: Float)
-	blend: abstract func ~alphaMonochrome
+	disableBlend: abstract func
+	blendAdd: abstract func
+	blendWhite: abstract func
+	blendAlpha: abstract func
 	createFence: abstract func -> GLFence
 	createFramebufferObject: abstract func (texture: GLTexture, size: IntVector2D) -> GLFramebufferObject
 	createQuad: abstract func -> GLQuad
@@ -29,6 +31,7 @@ GLContext: abstract class {
 	createVolumeTexture: abstract func (size: IntVector3D, pixels: Byte*) -> GLVolumeTexture
 	createRenderer: abstract func -> GLRenderer
 	createVertexArrayObject: abstract func (vertices: FloatPoint3D[], textureCoordinates: FloatPoint2D[]) -> GLVertexArrayObject
+	createIndexBufferObject: abstract func (vertices: FloatPoint3D[], textureCoordinates: FloatPoint2D[], indices: IntPoint3D[]) -> GLIndexBufferObject
 	createContext: static func ~shared (display: Pointer, nativeBackend: Long, sharedContext: This = null) -> This {
 		// This function will check whether a context creation succeeded and if not try to create a context for another OpenGL version
 		Gles3Context create(display, nativeBackend, sharedContext as Gles3Context)

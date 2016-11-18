@@ -68,12 +68,6 @@ FloatEuclidTransformTest: class extends Fixture {
 
 			(kernel, quaternions, euclidTransforms) free()
 		})
-		this add("toText", func {
-			euclidTransform := FloatEuclidTransform new()
-			text := euclidTransform toText() take()
-			expect(text, is equal to(t"Translation: 0.00, 0.00, 0.00 Rotation: Real: 1.00 Imaginary: 0.00 0.00 0.00 Scaling: 1.00"))
-			text free()
-		})
 		this add("inverse", func {
 			transform := FloatEuclidTransform new(FloatVector3D new(), FloatRotation3D createRotationZ(3))
 			inverse := transform inverse
@@ -85,6 +79,16 @@ FloatEuclidTransformTest: class extends Fixture {
 			(translation, quaternion) := (first translation as FloatVector3D, first rotation _quaternion as Quaternion)
 			expect(translation norm, is equal to(0.f))
 			expect(quaternion isIdentity, is true)
+		})
+		this add("mix", func {
+			transform1 := FloatEuclidTransform new()
+			transform2 := FloatEuclidTransform new(FloatVector3D new(1.f, 2.f, 3.f), FloatRotation3D createFromEulerAngles(0.1f, 0.2f, 0.3f), 0.95f)
+			expect(transform1 mix(transform2, 0.f), is equal to(transform1))
+			expect(transform1 mix(transform2, 1.f), is equal to(transform2))
+			mixedTransform := transform1 mix(transform2, 0.5f)
+			expect(mixedTransform translation, is equal to(FloatVector3D new(0.5f, 1.f, 1.5f)))
+			expect(mixedTransform rotation, is equal to(FloatRotation3D new(Quaternion new(0.9958282709f, 0.0172071829f, 0.0532323383f, 0.0720868334f))))
+			expect(mixedTransform scaling, is equal to(0.975f))
 		})
 	}
 }

@@ -16,16 +16,19 @@ String: class {
 	// Avoid direct buffer access, as it breaks immutability.
 	_buffer: CharBuffer
 	size ::= this _buffer size
-
+	_locked := false // Only global termination may unlock and free literals
 	init: func ~withBuffer (=_buffer)
 	init: func ~withCStr (s: CString) { init(s, s length()) }
 	init: func ~withCStrAndLength (s: CString, length: Int) { this _buffer = CharBuffer new(s, length) }
 	free: override func {
-		if (this _buffer mallocAddr == 0)
-			string_literal_free(this)
-		this _buffer free()
-		super()
+		if (!this _locked) {
+			if (this _buffer mallocAddr == 0)
+				string_literal_free(this)
+			this _buffer free()
+			super()
+		}
 	}
+	_unlock: func { this _locked = false }
 	equals: final func (other: This) -> Bool {
 		result := false
 		if (this == null)
@@ -36,29 +39,94 @@ String: class {
 	}
 	length: func -> Int { this _buffer size }
 	clone: func -> This { This new(this _buffer clone()) }
-	substring: func ~tillEnd (start: Int) -> This { this substring(start, this size) }
-	substring: func (start, end: Int) -> This { (this _buffer clone()) substring(start, end) . toString() }
-	times: func (count: Int) -> This { (this _buffer clone(this size * count)) times(count) . toString() }
-	append: func ~str (other: This) -> This {
-		if (!other) return this
-		(this _buffer clone(this size + other size)) append(other _buffer) . toString()
+	substring: func ~tillEnd (start: Int, freeOriginal := false) -> This { this substring(start, this size, freeOriginal) }
+	substring: func (start, end: Int, freeOriginal := false) -> This {
+		result := this _buffer clone() . substring(start, end)
+		if (freeOriginal)
+			this free()
+		result toString()
 	}
-	append: func ~char (other: Char) -> This { (this _buffer clone(this size + 1)) append(other) . toString() }
-	append: func ~cStr (other: CString) -> This { (this _buffer clone(this size + other length())) append(other, other length()) . toString() }
-	prepend: func ~str (other: This) -> This { (this _buffer clone()) prepend(other _buffer) . toString() }
-	prepend: func ~char (other: Char) -> This { (this _buffer clone()) prepend(other) . toString() }
+	times: func (count: Int, freeOriginal := false) -> This {
+		result := this _buffer clone(this size * count) . times(count)
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
+	append: func ~str (other: This, freeOriginal := false) -> This {
+		result := this
+		if (other) {
+			newBuffer := this _buffer clone(this size + other size) . append(other _buffer)
+			result = newBuffer toString()
+			if (freeOriginal)
+				this free()
+		}
+		result
+	}
+	append: func ~char (other: Char, freeOriginal := false) -> This {
+		result := this _buffer clone(this size + 1) . append(other)
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
+	append: func ~cStr (other: CString, freeOriginal := false) -> This {
+		result := this _buffer clone(this size + other length()) . append(other, other length())
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
+	prepend: func ~str (other: This, freeOriginal := false) -> This {
+		result := this
+		if (other) {
+			newBuffer := this _buffer clone() . prepend(other _buffer)
+			result = newBuffer toString()
+			if (freeOriginal)
+				this free()
+		}
+		result
+	}
+	prepend: func ~char (other: Char, freeOriginal := false) -> This {
+		result := this _buffer clone() . prepend(other)
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
 	empty: func -> Bool { this _buffer empty() }
 	startsWith: func (s: This) -> Bool { this _buffer startsWith(s _buffer) }
 	startsWith: func ~char (c: Char) -> Bool { this _buffer startsWith(c) }
 	endsWith: func (s: This) -> Bool { this _buffer endsWith(s _buffer) }
 	endsWith: func ~char (c: Char) -> Bool { this _buffer endsWith(c) }
-	find: func (what: This, offset: Int, searchCaseSensitive := true) -> Int { this _buffer find(what _buffer, offset, searchCaseSensitive) }
+	find: func (what: This, offset: Int = 0, searchCaseSensitive := true) -> Int { this _buffer find(what _buffer, offset, searchCaseSensitive) }
 	findAll: func (what: This, searchCaseSensitive := true) -> VectorList <Int> { this _buffer findAll(what _buffer, searchCaseSensitive) }
-	replaceAll: func ~str (what, with: This, searchCaseSensitive := true) -> This { (this _buffer clone()) replaceAll(what _buffer, with _buffer, searchCaseSensitive) . toString() }
-	replaceAll: func ~char (oldie, kiddo: Char) -> This { (this _buffer clone()) replaceAll~char(oldie, kiddo) . toString() }
-	map: func (f: Func (Char) -> Char) -> This { (this _buffer clone()) map(f) . toString() }
-	toLower: func -> This { (this _buffer clone()) toLower() . toString() }
-	toUpper: func -> This { (this _buffer clone()) toUpper() . toString() }
+	replaceAll: func ~str (what, with: This, searchCaseSensitive := true, freeOriginal := false) -> This {
+		result := this _buffer clone() . replaceAll(what _buffer, with _buffer, searchCaseSensitive)
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
+	replaceAll: func ~char (what, with: Char, freeOriginal := false) -> This {
+		result := this _buffer clone() . replaceAll~char(what, with)
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
+	map: func (f: Func (Char) -> Char, freeOriginal := false) -> This {
+		result := this _buffer clone() . map(f)
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
+	toLower: func (freeOriginal := false) -> This {
+		result := this _buffer clone() . toLower()
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
+	toUpper: func (freeOriginal := false) -> This {
+		result := this _buffer clone() . toUpper()
+		if (freeOriginal)
+			this free()
+		result toString()
+	}
 	indexOf: func ~char (c: Char, start: Int = 0) -> Int { this _buffer indexOf(c, start) }
 	indexOf: func ~string (s: This, start: Int = 0) -> Int { this _buffer indexOf(s _buffer, start) }
 	contains: func ~char (c: Char) -> Bool { this _buffer contains(c) }
@@ -96,15 +164,14 @@ String: class {
 	_bufVectorListToStrVectorList: func (x: VectorList<CharBuffer>) -> VectorList<This> {
 		result := VectorList<This> new(x count)
 		for (i in 0 .. x count)
-			result add (x[i] toString())
+			result add(x[i] toString())
 		result
 	}
 	capitalize: func -> This {
-		match (this size) {
-			case 0 => this
-			case 1 => this toUpper()
-			case => this[0] toUpper() + this substring(1)
-		}
+		result := this clone()
+		if (result size > 0)
+			result _buffer[0] = result[0] toUpper()
+		result
 	}
 	cformat: final func ~str (...) -> This {
 		list: VaList
@@ -123,7 +190,10 @@ String: class {
 		this _bufVectorListToStrVectorList(this _buffer split(c, maxTokens))
 	}
 	split: func ~withStringWithoutmaxTokens (s: This) -> VectorList<This> {
-		this _bufVectorListToStrVectorList(this _buffer split(s _buffer, -1))
+		bufferSplit := this _buffer split(s _buffer)
+		result := this _bufVectorListToStrVectorList(bufferSplit)
+		bufferSplit free()
+		result
 	}
 	split: func ~withCharWithoutmaxTokens (c: Char) -> VectorList<This> {
 		bufferSplit := this _buffer split(c)
@@ -146,46 +216,55 @@ String: class {
 	split: func ~str (delimiter: This, maxTokens: SSizeT) -> VectorList<This> {
 		this _bufVectorListToStrVectorList(this _buffer split(delimiter _buffer, maxTokens))
 	}
+
+	operator + (other: Float) -> This { this << other toString() }
+	operator + (other: Double) -> This { this << other toString() }
+	operator + (other: UInt) -> This { this << other toString() }
+	operator + (other: Int) -> This { this << other toString() }
+
+	operator & (other: Float) -> This { this & other toString() }
+	operator & (other: Double) -> This { this & other toString() }
+	operator & (other: UInt) -> This { this & other toString() }
+	operator & (other: Int) -> This { this & other toString() }
+
+	operator == (other: This) -> Bool { this equals(other) }
+	operator != (other: This) -> Bool { !this equals(other) }
+	operator [] (index: Int) -> Char { this _buffer[index] }
+	operator [] (range: Range) -> This { this substring(range min, range max) }
+
+	operator + (other: This) -> This { this append(other) }
+	operator + (other: Char) -> This { this append(other, true) }
+	operator + (other: CString) -> This { this append(other) }
+	operator & (other: This) -> This {
+		result := this + other
+		(this, other) free()
+		result
+	}
+	operator >> (other: This) -> This {
+		result := this + other
+		this free()
+		result
+	}
+	operator << (other: This) -> This {
+		result := this + other
+		other free()
+		result
+	}
+
 	free: static func ~all {
 		string_literal_free_all()
 	}
 }
 
-operator + (left, right: String) -> String { left append(right) }
-operator == (left, right: String) -> Bool { left equals(right) }
-operator != (left, right: String) -> Bool { !left equals(right) }
-operator + (left: String, right: Char) -> String { left append(right) }
-operator + (left: String, right: CString) -> String { left append(right) }
-operator + (left: String, right: LLong) -> String { left append(right toString()) }
-operator + (left: String, right: LDouble) -> String { left append(right toString()) }
 operator + (left: Char, right: String) -> String { right prepend(left) }
-operator + (left: LLong, right: String) -> String { left toString() append(right) }
-operator + (left: LDouble, right: String) -> String { left toString() append(right) }
-operator * (string: String, count: Int) -> String { string times(count) }
-operator [] (string: String, index: Int) -> Char { string _buffer [index] }
-operator [] (string: String, range: Range) -> String { string substring(range min, range max) }
 operator implicit as (s: String) -> Char* { s ? s toCString() : null }
 operator implicit as (s: String) -> CString { s ? s toCString() : null }
 operator implicit as (c: Char*) -> String { c ? String new(c, strlen(c)) : null }
 operator implicit as (c: CString) -> String { c ? String new(c, strlen(c)) : null }
-operator & (left, right: String) -> String {
-	result := left + right
-	left free()
-	right free()
-	result
-}
-operator >> (left, right: String) -> String {
-	result := left + right
-	left free()
-	result
-}
-operator << (left, right: String) -> String {
-	result := left + right
-	right free()
-	result
-}
+
 makeStringLiteral: func (str: CString, strLen: Int) -> String {
 	result := String new(CharBuffer new(str, strLen, true))
+	result _locked = true
 	string_literal_new(result)
 	result
 }
@@ -212,4 +291,4 @@ cStringPtrToStringPtr: func (cstr: CString*, len: Int) -> String* {
 	toRet
 }
 
-GlobalCleanup register(|| String free~all(), true)
+GlobalCleanup register(|| String free~all(), 10)

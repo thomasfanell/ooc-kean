@@ -83,13 +83,13 @@ FloatVectorList: class extends VectorList<Float> {
 			result add(this[i] abs())
 		result
 	}
-	copy: func -> This {
+	copy: override func -> This {
 		result := This new(this _count)
 		for (i in 0 .. this _count)
 			result add(this[i])
 		result
 	}
-	reverse: func -> This {
+	reverse: override func -> This {
 		super() as This
 	}
 	addInto: func (other: This) {
@@ -97,19 +97,10 @@ FloatVectorList: class extends VectorList<Float> {
 		for (i in 0 .. minimumCount)
 			this[i] = this[i] + other[i]
 	}
-	toString: func -> String {
-		result := ""
-		for (i in 0 .. this _count)
-			result = result >> this[i] toString() >> "\n"
-		result
-	}
-	toText: func -> Text {
-		result: Text
-		textBuilder := TextBuilder new()
-		for (i in 0 .. this _count)
-			textBuilder append(this[i] toText())
-		result = textBuilder join(t"\n")
-		textBuilder free()
+	toString: func (separator := "\n", decimals := 2) -> String {
+		result := this _count > 0 ? this[0] toString(decimals) : ""
+		for (i in 1 .. this _count)
+			result = (result >> separator) & this[i] toString(decimals)
 		result
 	}
 	divideByMaxValue: func -> This {
@@ -121,7 +112,7 @@ FloatVectorList: class extends VectorList<Float> {
 	}
 	sum: func (start, end: Int) -> Float {
 		version(safe)
-			raise(start < 0 || start >= this count || end < 0 || end >= this count , "invalid range in FloatVectorList sum()")
+			Debug error(start < 0 || start >= this count || end < 0 || end >= this count , "invalid range in FloatVectorList sum()")
 		result := this[start]
 		for (i in start + 1 .. end + 1)
 			result += this[i]
@@ -271,8 +262,7 @@ FloatVectorList: class extends VectorList<Float> {
 		for (index in 0 .. this count)
 			rightHandSide[0, index] = 3.f * (thisPointer[(this count - 1) minimum(index + 1)] - thisPointer[0 maximum(index - 1)])
 		constants := coefficientMatrix solveTridiagonal(rightHandSide) take()
-		coefficientMatrix free()
-		rightHandSide free()
+		(coefficientMatrix, rightHandSide) free()
 
 		for (index1 in 0 .. this count - 1) {
 			result add(this[index1])
@@ -299,7 +289,7 @@ FloatVectorList: class extends VectorList<Float> {
 			for (index1 in 0 .. this count - 1) {
 				result add(thisPointer[index1])
 				for (index2 in 1 .. numberOfPoints + 1)
-					result add((index2 as Float / (numberOfPoints + 1) as Float) linearInterpolation(thisPointer[index1], thisPointer[index1 + 1]))
+					result add(Float mix(thisPointer[index1], thisPointer[index1 + 1], index2 as Float / (numberOfPoints + 1) as Float))
 			}
 			result add(thisPointer[this count - 1])
 		} else
@@ -509,5 +499,14 @@ FloatVectorList: class extends VectorList<Float> {
 		for (i in 0 .. (this count < other count ? this count : other count))
 			maximumDifference = maximumDifference maximum((this[i] - other[i]) absolute)
 		maximumDifference
+	}
+
+	parse: static func (data, separator: String) -> This {
+		items := data split(separator)
+		result := This new(items count)
+		for (i in 0 .. items count)
+			result add(items[i] toFloat())
+		items free()
+		result
 	}
 }

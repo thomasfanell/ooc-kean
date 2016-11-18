@@ -20,6 +20,7 @@ EGL_DEFAULT_DISPLAY: extern const Pointer
 EGL_NO_CONTEXT: extern const Pointer
 EGL_NO_DISPLAY: extern const Pointer
 EGL_NO_SURFACE: extern const Pointer
+EGL_NO_IMAGE_KHR: extern const Pointer
 
 /* Out-of-band attribute value */
 EGL_DONT_CARE: extern const Int
@@ -167,8 +168,12 @@ EGL_ALPHA_FORMAT_PRE: extern const UInt
 /* Extensions */
 EGL_IMAGE_PRESERVED_KHR: extern const UInt
 EGL_NATIVE_BUFFER_ANDROID: extern const UInt
+EGL_SYNC_NATIVE_FENCE_ANDROID: extern const UInt
+EGL_SYNC_NATIVE_FENCE_FD_ANDROID: extern const UInt
+EGL_NO_NATIVE_FENCE_FD_ANDROID: extern const UInt
+EGL_SYNC_FLUSH_COMMANDS_BIT_KHR: extern const UInt
 __eglMustCastToProperFunctionPointerType_OOC: cover from __eglMustCastToProperFunctionPointerType
-eglGetProcAddress: extern func (procname: CString) -> Func
+eglGetProcAddress: extern func (procname: CString) -> Pointer
 PFNEGLCREATEIMAGEKHRPROC_OOC: cover from PFNEGLCREATEIMAGEKHRPROC
 PFNEGLDESTROYIMAGEKHRPROC_OOC: cover from PFNEGLDESTROYIMAGEKHRPROC
 
@@ -186,4 +191,6 @@ eglGetConfigAttrib: extern func (display: Pointer, config: Pointer, attribute: I
 eglSwapBuffers: extern func (display, surface: Pointer)
 eglTerminate: extern func (display: Pointer) -> UInt
 eglGetError: extern func -> UInt
+eglGetCurrentContext: extern func -> Pointer
+eglQueryString: extern func (display: Pointer, name: UInt) -> Char*
 }

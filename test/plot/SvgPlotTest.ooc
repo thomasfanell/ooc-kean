@@ -98,23 +98,20 @@ SvgPlotTest: class extends Fixture {
 			formatPlot xAxis roundAxisEndpoints = false // defaults to true, if set to false the axis endpoints will be equal to the data's endpoints
 
 			// Write plots to file
-			filename := "test/plot/output/"
-			file := File new(filename)
-			folder := file parent . mkdirs() . free()
-			file free()
-			filename = filename >> "example.svg"
+			File createDirectories("test/plot/output")
+			filename := "test/plot/output/example.svg"
 			writer := SvgWriter2D new(filename, logPlot)
 			writer addPlot(scatterPlot)
 			writer addPlot(trigonometryPlot)
 			writer addPlot(unitCirclePlot)
 			writer addPlot(symmetricUnitCirclePlot)
 			writer addPlot(formatPlot)
-			writer write()
-			writer free()
+			writer write() . free()
+			filename free()
 		})
 		this add("Output check", func {
-			generatedFile := FileReader new(t"test/plot/output/example.svg")
-			comparisonFile := FileReader new(t"test/plot/input/exampleComparison.svg")
+			generatedFile := FileReader new("test/plot/output/example.svg")
+			comparisonFile := FileReader new("test/plot/input/exampleComparison.svg")
 			while (generatedFile hasNext() && comparisonFile hasNext()) {
 				(generatedString, comparisonString) := (generatedFile readUntil(' '), comparisonFile readUntil(' '))
 				// If they differ, it can only be due to (small) roundoff errors

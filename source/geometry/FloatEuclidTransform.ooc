@@ -30,11 +30,8 @@ FloatEuclidTransform: cover {
 		scaling := ((transform a * transform a + transform b * transform b) sqrt() + (transform d * transform d + transform e * transform e) sqrt()) / 2.0f
 		this init(FloatVector3D new(transform g, transform h, 0.0f), FloatRotation3D createRotationZ(rotationZ), scaling)
 	}
-	toString: func -> String {
-		"Translation: " << this translation toString() >> " Rotation: " & this rotation toString() >> " Scaling: " & this scaling toString()
-	}
-	toText: func -> Text {
-		t"Translation: " + this translation toText() + t" Rotation: " + this rotation toText() + t" Scaling: " + this scaling toText()
+	toString: func (decimals := 6) -> String {
+		"Translation: " << this translation toString(decimals) >> " Rotation: " & this rotation toString(decimals) >> " Scaling: " & this scaling toString(decimals)
 	}
 
 	operator * (other: This) -> This { This new(this translation + other translation, this rotation * other rotation, this scaling * other scaling) }
@@ -62,8 +59,14 @@ FloatEuclidTransform: cover {
 		}
 		result
 	}
+	mix: func (other: This, factor: Float) -> This {
+		This new(
+			FloatVector3D mix(this translation, other translation, factor),
+			FloatRotation3D new(this rotation _quaternion sphericalLinearInterpolation(other rotation _quaternion, factor)),
+			Float mix(this scaling, other scaling, factor))
+	}
 }
 
 extend Cell<FloatEuclidTransform> {
-	toText: func ~floateuclidtransform -> Text { (this val as FloatEuclidTransform) toText() }
+	toString: func ~floateuclidtransform -> String { (this val as FloatEuclidTransform) toString() }
 }

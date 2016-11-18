@@ -22,8 +22,8 @@ Quaternion: cover {
 	z ::= this imaginary z
 
 	isValid ::= this real isNumber && this imaginary isValid
-	isIdentity ::= this real equals(1.f) && this imaginary x equals(0.f) && this imaginary y equals(0.f) && this imaginary z equals(0.f)
-	isZero ::= this real equals(0.f) && this imaginary x equals(0.f) && this imaginary y equals(0.f) && this imaginary z equals(0.f)
+	isIdentity ::= this real equals(1.f) && this imaginary isZero
+	isZero ::= this real equals(0.f) && this imaginary isZero
 	norm ::= (this real squared + this imaginary norm squared) sqrt()
 	normalized ::= this / this norm
 	conjugate ::= This new(this real, -this imaginary)
@@ -169,12 +169,8 @@ Quaternion: cover {
 		(axis, angle) := this toAxisAngle()
 		FloatVector3D new(axis x, axis y, axis z) * angle
 	}
-	toString: func -> String {
-		"Real: " << "%8f" formatFloat(this real) >>
-		" Imaginary: " & "%8f" formatFloat(this imaginary x) >> " " & "%8f" formatFloat(this imaginary y) >> " " & "%8f" formatFloat(this imaginary z)
-	}
-	toText: func -> Text {
-		t"Real: " + this real toText() + t" Imaginary: " + this imaginary x toText() + t" " + this imaginary y toText() + t" " + this imaginary z toText()
+	toString: func (decimals := 6) -> String {
+		"Real: " << this real toString(decimals) >> " Imaginary: " & this imaginary x toString(decimals) >> " " & this imaginary y toString(decimals) >> " " & this imaginary z toString(decimals)
 	}
 
 	operator * (other: This) -> This {
@@ -296,5 +292,5 @@ Quaternion: cover {
 operator * (value: Float, other: Quaternion) -> Quaternion { other * value }
 
 extend Cell<Quaternion> {
-	toText: func ~quaternion -> Text { (this val as Quaternion) toText() }
+	toString: func ~quaternion -> String { (this val as Quaternion) toString() }
 }

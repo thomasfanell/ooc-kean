@@ -12,10 +12,10 @@ use collections
 use base
 
 FloatBox2DTest: class extends Fixture {
-	box0 := FloatBox2D new (1.0f, 2.0f, 3.0f, 4.0f)
-	box1 := FloatBox2D new (4.0f, 3.0f, 2.0f, 1.0f)
-	box2 := FloatBox2D new (2.0f, 1.0f, 4.0f, 3.0f)
-	box3 := FloatBox2D new (2.6f, 1.2f, 4.9f, 3.01f)
+	box0 := FloatBox2D new(1.0f, 2.0f, 3.0f, 4.0f)
+	box1 := FloatBox2D new(4.0f, 3.0f, 2.0f, 1.0f)
+	box2 := FloatBox2D new(2.0f, 1.0f, 4.0f, 3.0f)
+	box3 := FloatBox2D new(2.6f, 1.2f, 4.9f, 3.01f)
 	init: func {
 		tolerance := 1.0e-5f
 		super("FloatBox2D")
@@ -77,6 +77,7 @@ FloatBox2DTest: class extends Fixture {
 			expect(inBox[0], is equal to(0))
 			expect(inBox[1], is equal to(1))
 			expect(inBox[2], is equal to(3))
+			(list, inBox) free()
 		})
 		this add("enlarge and shrink", func {
 			box := FloatBox2D new(-2.0f, -1.0f, 3.0f, 3.0f)
@@ -121,12 +122,9 @@ FloatBox2DTest: class extends Fixture {
 			expect(adapted height, is equal to(1.5f) within(tolerance))
 		})
 		this add("toString", func {
-			expect(this box0 toString() == "1.00, 2.00, 3.00, 4.00")
-		})
-		this add("toText", func {
-			text := this box0 toText() take()
-			expect(text, is equal to(t"1.00, 2.00, 3.00, 4.00"))
-			text free()
+			string := this box0 toString()
+			expect(string, is equal to("1.00, 2.00, 3.00, 4.00"))
+			string free()
 		})
 		this add("bounds", func {
 			points := VectorList<FloatPoint2D> new()
@@ -144,7 +142,7 @@ FloatBox2DTest: class extends Fixture {
 			points free()
 		})
 		this add("parse", func {
-			box := FloatBox2D parse(t"1.0, 2.0, 3.0, 4.0")
+			box := FloatBox2D parse("1.0, 2.0, 3.0, 4.0")
 			expect(box left, is equal to(1.0f) within(tolerance))
 			expect(box top, is equal to(2.0f) within(tolerance))
 			expect(box right, is equal to(1.0f + 3.0f) within(tolerance))
@@ -224,7 +222,7 @@ FloatBox2DTest: class extends Fixture {
 		this add("interpolate", func {
 			a := FloatBox2D new(1.0f, 5.0f, 3.0f, 4.0f)
 			b := FloatBox2D new(4.0f, -1.0f, 0.0f, 1.0f)
-			interpolatedBox := FloatBox2D linearInterpolation(a, b, 1.0f / 3.0f)
+			interpolatedBox := FloatBox2D mix(a, b, 1.0f / 3.0f)
 			expect(interpolatedBox left, is equal to(2.0f) within(tolerance))
 			expect(interpolatedBox top, is equal to(3.0f) within(tolerance))
 			expect(interpolatedBox width, is equal to(2.0f) within(tolerance))

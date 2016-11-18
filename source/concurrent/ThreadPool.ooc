@@ -37,6 +37,21 @@ _Task: abstract class {
 		this _mutex unlock()
 		this _state == _PromiseState Finished
 	}
+	wait: func ~timeout (time: TimeSpan) -> Bool {
+		status := false
+		if (time == TimeSpan maximumValue)
+			this wait()
+		else {
+			timer := WallTimer new() . start()
+			while (timer stop() < time && !status) {
+				status = (this _state != _PromiseState Unfinished)
+				if (!status)
+					Time sleepMilli(1)
+			}
+			timer free()
+		}
+		this _state == _PromiseState Finished
+	}
 	cancel: func -> Bool {
 		status := false
 		this _mutex lock()
@@ -72,19 +87,16 @@ _ActionTask: class extends _Task {
 }
 
 _ResultTask: class <T> extends _Task {
-	_result: Object
+	_result: __onheap__ T
 	_action: Func -> T
-	_hasCover := false
 	init: func (=_action, mutex: Mutex) { super(mutex) }
-	_free: override func { (this _action as Closure) free(Owner Receiver) }
+	_free: override func {
+		(this _action as Closure) free(Owner Receiver)
+		memfree(this _result)
+	}
 	run: override func {
 		temporary := this _action()
-		if (T inheritsFrom(Object))
-			this _result = temporary
-		else {
-			this _result = Cell<T> new(temporary)
-			this _hasCover = true
-		}
+		this _result = temporary
 		this _finishedTask()
 	}
 }
@@ -96,19 +108,7 @@ _TaskPromise: class extends Promise {
 		this _task free()
 		super()
 	}
-	wait: override func -> Bool { this _task wait() }
-	wait: override func ~timeout (time: TimeSpan) -> Bool {
-		timer := CpuTimer new() . start()
-		seconds := time toSeconds()
-		status := false
-		while (timer stop() / 1000.0 < seconds && !status) {
-			status = (this _task _state != _PromiseState Unfinished)
-			if (!status)
-				Time sleepMilli(seconds / 10 as Int)
-		}
-		timer free()
-		status
-	}
+	wait: override func (time: TimeSpan) -> Bool { this _task wait(time) }
 	cancel: override func -> Bool {
 		//TODO: Interrupt executing thread and have it move on to the next task in queue
 		this _task cancel()
@@ -122,27 +122,11 @@ _TaskFuture: class <T> extends Future<T> {
 		this _task free()
 		super()
 	}
-	wait: override func -> Bool { this _task wait() }
-	wait: override func ~timeout (time: TimeSpan) -> Bool {
-		timer := CpuTimer new() . start()
-		seconds := time toSeconds()
-		status := false
-		while (timer stop() / 1000.0 < seconds && !status) {
-			status = (this _task _state != _PromiseState Unfinished)
-			if (!status)
-				Time sleepMilli(seconds / 10 as Int)
-		}
-		timer free()
-		status
-	}
+	wait: override func (time: TimeSpan) -> Bool { this _task wait(time) }
 	getResult: override func (defaultValue: T) -> T {
 		result := defaultValue
-		if (this _task _state == _PromiseState Finished) {
-			if (this _task _hasCover)
-				result = this _task _result as Cell<T> get()
-			else
-				result = this _task _result
-		}
+		if (this _task _state == _PromiseState Finished)
+			result = this _task _result
 		result
 	}
 	cancel: override func -> Bool {

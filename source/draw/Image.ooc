@@ -8,71 +8,79 @@
 
 use geometry
 use base
-import Canvas
-
-CoordinateSystem: enum {
-	Default = 0x00
-	XRightward = 0x00
-	XLeftward = 0x01
-	YDownward = 0x00
-	YUpward = 0x02
-}
+use draw
 
 Image: abstract class {
 	_size: IntVector2D
 	_referenceCount: ReferenceCounter
-	_coordinateSystem: CoordinateSystem
-	_canvas: Canvas
 	size ::= this _size
 	width ::= this size x
 	height ::= this size y
-	coordinateSystem ::= this _coordinateSystem
-	crop: IntShell2D { get set }
-	wrap: Bool { get set }
 	referenceCount ::= this _referenceCount
-	transform ::= IntTransform2D createScaling(
-			(this coordinateSystem & CoordinateSystem XLeftward) == CoordinateSystem XLeftward ? -1 : 1,
-			(this coordinateSystem & CoordinateSystem YUpward) == CoordinateSystem YUpward ? -1 : 1)
-
-	canvas: Canvas { get {
-		if (this _canvas == null)
-			this _canvas = this _createCanvas()
-		this _canvas
-	}}
-	init: func (=_size, coordinateSystem := CoordinateSystem Default) {
-		this _referenceCount = ReferenceCounter new(this)
-		this _coordinateSystem = coordinateSystem
-	}
-	init: func ~fromImage (original: This) {
-		this init(original size)
-		this _coordinateSystem = original coordinateSystem
-		this crop = original crop
-		this wrap = original wrap
-	}
+	init: func (=_size) { this _referenceCount = ReferenceCounter new(this) }
 	free: override func {
-		if (this referenceCount != null)
-			this referenceCount free()
+		this _referenceCount free()
 		this _referenceCount = null
-		if (this _canvas != null)
-			this _canvas free()
-		this _canvas = null
 		super()
 	}
+	drawPoint: virtual func (position: FloatPoint2D, pen: Pen = Pen new(ColorRgba white)) {
+		list := VectorList<FloatPoint2D> new(1)
+		list add(position)
+		this drawPoints(list, pen)
+		list free()
+	}
+	drawLine: virtual func (start, end: FloatPoint2D, pen: Pen = Pen new(ColorRgba white)) {
+		list := VectorList<FloatPoint2D> new(2)
+		list add(start) . add(end)
+		this drawLines(list, pen)
+		list free()
+	}
+	drawPoints: virtual func (pointList: VectorList<FloatPoint2D>, pen: Pen = Pen new(ColorRgba white)) { Debug error("drawPoints unimplemented for class %s!" format(this class name)) }
+	drawLines: virtual func (pointList: VectorList<FloatPoint2D>, pen: Pen = Pen new(ColorRgba white)) { Debug error("drawLines unimplemented for class %s!" format(this class name)) }
+	drawBox: virtual func (box: FloatBox2D, pen: Pen = Pen new(ColorRgba white)) {
+		positions := VectorList<FloatPoint2D> new(5)
+		positions add(box leftTop)
+		positions add(box rightTop)
+		positions add(box rightBottom)
+		positions add(box leftBottom)
+		positions add(box leftTop)
+		this drawLines(positions, pen)
+		positions free()
+	}
+	fill: virtual func (color: ColorRgba) { Debug error("fill unimplemented for class %s!" format(this class name)) }
+	draw: virtual func ~DrawState (drawState: DrawState) { Debug error("draw~DrawState unimplemented for class %s!" format(this class name)) }
 	resizeWithin: func (restriction: IntVector2D) -> This {
 		restrictionFraction := (restriction x as Float / this size x as Float) minimum(restriction y as Float / this size y as Float)
 		this resizeTo((this size toFloatVector2D() * restrictionFraction) toIntVector2D())
 	}
 	resizeTo: abstract func (size: IntVector2D) -> This
-	resizeTo: virtual func ~withMethod (size: IntVector2D, Interpolate: Bool) -> This {
-		this resizeTo(size)
-	}
-	create: virtual func (size: IntVector2D) -> This { raise("Image::create not implemented for type: %s" format(this class name)); null }
+	resizeTo: virtual func ~withMethod (size: IntVector2D, Interpolate: Bool) -> This { this resizeTo(size) }
+	create: virtual func (size: IntVector2D) -> This { Debug error("create unimplemented for class %s!" format(this class name)); null }
 	copy: abstract func -> This
-	copy: abstract func ~fromParams (size: IntVector2D, transform: FloatTransform2D) -> This
 	distance: virtual abstract func (other: This) -> Float
 	equals: func (other: This) -> Bool { this size == other size && this distance(other) < 10 * Float epsilon }
-	isValidIn: func (x, y: Int) -> Bool {
-		x >= 0 && x < this size x && y >= 0 && y < this size y
+	isValidIn: func (x, y: Int) -> Bool { x >= 0 && x < this size x && y >= 0 && y < this size y }
+	// Writes white text on the existing image
+	write: virtual func (message: String, fontAtlas: This, localOrigin: IntPoint2D) {
+		skippedRows := 2
+		visibleRows := 6
+		columns := 16
+		fontSize := DrawContext getFontSize(fontAtlas)
+		viewport := IntBox2D new(localOrigin, fontSize)
+		targetOffset := IntPoint2D new(0, 0)
+		characterDrawState := DrawState new(this) setInputImage(fontAtlas) setBlendMode(BlendMode White)
+		for (i in 0 .. message size) {
+			charCode := message[i] as Int
+			sourceX := charCode % columns
+			sourceY := (charCode / columns) - skippedRows
+			source := FloatBox2D new((sourceX as Float) / columns, (sourceY as Float) / visibleRows, 1.0f / columns, 1.0f / visibleRows)
+			if ((charCode as Char) graph())
+				characterDrawState setViewport(viewport + (targetOffset * fontSize)) setSourceNormalized(source) draw()
+			targetOffset x += 1
+			if (charCode == '\n') {
+				targetOffset x = 0 // Carriage return
+				targetOffset y += 1 // Line feed
+			}
+		}
 	}
-	_createCanvas: virtual func -> Canvas { null }
 }

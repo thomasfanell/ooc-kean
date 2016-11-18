@@ -41,8 +41,8 @@ Demangler: class {
 							result type += c
 					}
 				}
-
 			result name = reader readAll()
+			reader free()
 		}
 		result
 	}
@@ -52,7 +52,7 @@ FullSymbol: class {
 	mangled: String
 	package := ""
 	type := ""
-	name := ""
+	name: String
 
 	init: func (=mangled) {
 		this name = mangled
@@ -64,5 +64,11 @@ FullSymbol: class {
 			case =>
 				"%s %s" format(this type, this name)
 		}
-	} }
+	}}
+	free: override func {
+		this package free()
+		this type free()
+		this name free()
+		super()
+	}
 }

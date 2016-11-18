@@ -38,20 +38,24 @@ Gles3FramebufferObject: class extends GLFramebufferObject {
 		glClearColor(tuple a, tuple b, tuple c, tuple d)
 		version(debugGL) { validateEnd("FramebufferObject setClearColor") }
 	}
-	readPixels: override func (buffer: ByteBuffer) {
+	readPixels: override func (target: RasterPacked) {
+		//NOTE: Hard coded to read RGBA only due to driver limitations
 		version(debugGL) { validateStart("FramebufferObject readPixels") }
-		pointer := buffer pointer
 		this bind()
 		glPixelStorei(GL_PACK_ALIGNMENT, 1)
+		pixelStride := target stride / 4
+		if (pixelStride != this size x)
+			glPixelStorei(GL_PACK_ROW_LENGTH, pixelStride)
 		glReadBuffer(GL_COLOR_ATTACHMENT0)
-		glReadPixels(0, 0, this size x, this size y, GL_RGBA, GL_UNSIGNED_BYTE, pointer)
+		glReadPixels(0, 0, this size x, this size y, GL_RGBA, GL_UNSIGNED_BYTE, target buffer pointer)
+		glPixelStorei(GL_PACK_ROW_LENGTH, 0)
 		this unbind()
 		version(debugGL) { validateEnd("FramebufferObject readPixels") }
 	}
 	setTarget: func (texture: Gles3Texture) {
 		version(debugGL) { validateStart("FramebufferObject setTarget") }
 		glBindFramebuffer(GL_FRAMEBUFFER, this _backend)
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture _backend, 0)
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture _target, texture _backend, 0)
 		glBindFramebuffer(GL_FRAMEBUFFER, 0)
 		version(debugGL) { validateEnd("FramebufferObject setTarget") }
 	}
@@ -59,7 +63,7 @@ Gles3FramebufferObject: class extends GLFramebufferObject {
 		version(debugGL) { validateStart("FramebufferObject _generate") }
 		glGenFramebuffers(1, this _backend&)
 		this bind()
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture _backend, 0)
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture _target, texture _backend, 0)
 		status: UInt = glCheckFramebufferStatus(GL_FRAMEBUFFER)
 		if (status != GL_FRAMEBUFFER_COMPLETE) {
 			statusMessage := getErrorMessage(status)

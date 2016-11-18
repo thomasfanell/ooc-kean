@@ -57,7 +57,7 @@ FloatComplexVectorList: class extends VectorList<FloatComplex> {
 		result _count = this _count
 		result
 	}
-	copy: func -> This {
+	copy: override func -> This {
 		super() as This
 	}
 	addInto: func (other: This) {
@@ -69,19 +69,10 @@ FloatComplexVectorList: class extends VectorList<FloatComplex> {
 			thisPointer[i] imaginary = thisPointer[i] imaginary + otherPointer[i] imaginary
 		}
 	}
-	toString: func -> String {
-		result := ""
-		for (i in 0 .. this _count)
-			result = result >> this[i] toString() >> "\n"
-		result
-	}
-	toText: func -> Text {
-		result: Text
-		textBuilder := TextBuilder new()
-		for (i in 0 .. this _count)
-			textBuilder append(this[i] toText())
-		result = textBuilder join(t"\n")
-		textBuilder free()
+	toString: func (separator := "\n", decimals := 2) -> String {
+		result := this _count > 0 ? this[0] toString(decimals) : ""
+		for (i in 1 .. this _count)
+			result = (result >> separator) & this[i] toString(decimals)
 		result
 	}
 
@@ -178,7 +169,7 @@ FloatComplexVectorList: class extends VectorList<FloatComplex> {
 	}
 	_fastFourierTransformHelper: static func (input: This, start, count: Int, buffer: This, bufferOffset: Int, result: This, resultOffset: Int) {
 		version (safe)
-			raise(buffer count < This _fastFourierTransformBufferSize(count), "Buffer size too small in fastFourierTransform")
+			Debug error(buffer count < This _fastFourierTransformBufferSize(count), "Buffer size too small in fastFourierTransform")
 		resultBuffer := result pointer as FloatComplex*
 		inputBuffer := input pointer as FloatComplex*
 		temporaryBuffer := buffer pointer as FloatComplex*

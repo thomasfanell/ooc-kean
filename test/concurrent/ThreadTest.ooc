@@ -62,6 +62,7 @@ ThreadTest: class extends Fixture {
 		expect(value get(), is less than(expectedValue))
 		thread free()
 		startedCondition free()
+		mutex unlock()
 		mutex free()
 		value free()
 		(job as Closure) free()
@@ -84,6 +85,7 @@ ThreadTest: class extends Fixture {
 		otherId free()
 		(job as Closure) free()
 		expect(myId equals(Thread currentThreadId()), is true)
+		(thisThreadInstance, otherThreadInstance) free()
 	}
 	_timedJoin: static func {
 		job := func {

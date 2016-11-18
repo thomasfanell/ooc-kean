@@ -16,7 +16,7 @@ PipeTest: class extends Fixture {
 		super("Pipe")
 		this add("Basic use", func {
 			scriptName: String
-			this _createOutputDirectory()
+			File createDirectories("test/io/output")
 			version (windows)
 				scriptName = "bash test/io/input/pipeprocesstester.sh"
 			else
@@ -43,14 +43,8 @@ PipeTest: class extends Fixture {
 			}
 
 			process wait()
-			reader close() . free()
-			(pipe, process) free()
+			(reader, pipe, process) free()
 		})
-	}
-	_createOutputDirectory: func {
-		file := File new("test/io/output")
-		file mkdir()
-		file free()
 	}
 }
 

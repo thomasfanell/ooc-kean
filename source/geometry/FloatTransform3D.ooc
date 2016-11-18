@@ -49,7 +49,7 @@ FloatTransform3D: cover {
 		// No FloatTransform3D instance should have a determinant of 0, so
 		// throw an exception, because something has gone wrong, somewhere.
 		if (determinant == 0)
-			raise("Determinant is zero in FloatTransform3D inverse()")
+			Debug error("Determinant is zero in FloatTransform3D inverse()")
 		a := (this f * this k * this p + this j * this o * this h + this n * this g * this l - this f * this o * this l - this j * this g * this p - this n * this k * this h) / determinant
 		e := (this e * this o * this l + this i * this g * this p + this m * this k * this h - this e * this k * this p - this i * this o * this h - this m * this g * this l) / determinant
 		i := (this e * this j * this p + this i * this n * this h + this m * this f * this l - this e * this n * this l - this i * this f * this p - this m * this j * this h) / determinant
@@ -97,17 +97,6 @@ FloatTransform3D: cover {
 		"%.8f" formatFloat(this b) >> ", " & "%.8f" formatFloat(this f) >> ", " & "%.8f" formatFloat(this j) >> ", " & "%.8f" formatFloat(this n) >> "\n" & \
 		"%.8f" formatFloat(this c) >> ", " & "%.8f" formatFloat(this g) >> ", " & "%.8f" formatFloat(this k) >> ", " & "%.8f" formatFloat(this o) >> "\n" & \
 		"%.8f" formatFloat(this d) >> ", " & "%.8f" formatFloat(this h) >> ", " & "%.8f" formatFloat(this l) >> ", " & "%.8f" formatFloat(this p)
-	}
-	toText: func -> Text {
-		result: Text
-		textBuilder := TextBuilder new()
-		textBuilder append(this a toText() + t", " + this e toText() + t", " + this i toText() + t", " + this m toText())
-		textBuilder append(this b toText() + t", " + this f toText() + t", " + this j toText() + t", " + this n toText())
-		textBuilder append(this c toText() + t", " + this g toText() + t", " + this k toText() + t", " + this o toText())
-		textBuilder append(this d toText() + t", " + this h toText() + t", " + this l toText() + t", " + this p toText())
-		result = textBuilder join(t"\n")
-		textBuilder free()
-		result
 	}
 	transformAndProject: func ~FloatPoint2D (point: FloatPoint2D, focalLength: Float) -> FloatPoint2D {
 		transformedWorldPoint := this * FloatPoint3D new(point x, point y, focalLength)
@@ -176,7 +165,7 @@ FloatTransform3D: cover {
 	operator [] (x, y: Int) -> Float {
 		result := 0.0f
 		version (safe)
-			raise(x < 0 || x > 3 || y < 0 || y > 3, "Out of bounds in FloatTransform3D get operator (#{x}, #{y})")
+			Debug error(x < 0 || x > 3 || y < 0 || y > 3, "Out of bounds in FloatTransform3D get operator (#{x}, #{y})")
 		match (x) {
 			case 0 =>
 				match (y) {
@@ -215,6 +204,10 @@ FloatTransform3D: cover {
 			this b * other x + this f * other y + this j * other z + this n,
 			this c * other x + this g * other y + this k * other z + this o
 		)
+	}
+	operator * (other: FloatTransform2D) -> This {
+		otherTransform3D := This new(other)
+		this * otherTransform3D
 	}
 
 	identity: static This { get { This new(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f) } }
@@ -258,5 +251,5 @@ FloatTransform3D: cover {
 }
 
 extend Cell<FloatTransform3D> {
-	toText: func ~floattransform3d -> Text { (this val as FloatTransform3D) toText() }
+	toString: func ~floattransform3d -> String { (this val as FloatTransform3D) toString() }
 }

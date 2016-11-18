@@ -6,6 +6,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
+use base
 use geometry
 use ui
 import external/x11
@@ -28,7 +29,7 @@ X11Window: class extends NativeWindow {
 			display = XOpenDisplay(":0")
 		}
 		if (display == null)
-			raise("Unable to open X Display")
+			Debug error("Unable to open X Display")
 		this _defaultScreen = XDefaultScreen(display)
 		this _displayDepth = DefaultDepth(display, this _defaultScreen)
 		root: Long = DefaultRootWindow(display)
@@ -64,6 +65,7 @@ X11Window: class extends NativeWindow {
 	}
 	resize: func (size: IntVector2D) { XResizeWindow(this display, this backend, size x, size y) }
 	draw: func (image: RasterRgba) {
+		image swapRedBlue()
 		if (this _cacheSize != image size) {
 			if (this _xImage)
 				XDestroyImage(this _xImage)

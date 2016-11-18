@@ -6,21 +6,23 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-use math
-import FloatPoint2D
+import IntPoint2D
 import IntVector2D
+import FloatPoint2D
 use base
+use math
 
 FloatVector2D: cover {
 	x, y: Float
 
 	area ::= this x * this y
-	length ::= this norm
 	hasZeroArea ::= this area equals(0.0f)
 	norm ::= (this x squared + this y squared) sqrt()
-	normalized ::= this / this norm
+	isZero ::= this norm equals(0.0f)
+	normalized ::= this isZero ? (this as This) : this / this norm
 	azimuth ::= this y atan2(this x)
 	absolute ::= This new(this x absolute, this y absolute)
+	sign ::= This new(this x sign, this y sign)
 
 	init: func@ (=x, =y)
 	init: func@ ~square (length: Float) { this x = this y = length }
@@ -43,10 +45,10 @@ FloatVector2D: cover {
 	maximum: func ~Float (floor: Float) -> This { this maximum(This new(floor)) }
 	clamp: func (floor, ceiling: This) -> This { This new(this x clamp(floor x, ceiling x), this y clamp(floor y, ceiling y)) }
 	limitLength: func (maximum: Float) -> This { this norm > maximum ? this normalized * maximum : this }
+	toIntPoint2D: func -> IntPoint2D { IntPoint2D new(this x as Int, this y as Int) }
 	toIntVector2D: func -> IntVector2D { IntVector2D new(this x as Int, this y as Int) }
 	toFloatPoint2D: func -> FloatPoint2D { FloatPoint2D new(this x, this y) }
-	toString: func -> String { "#{this x toString()}, #{this y toString()}" }
-	toText: func -> Text { this x toText() + t", " + this y toText() }
+	toString: func (decimals := 2) -> String { (this x toString(decimals) >> ", ") & this y toString(decimals) }
 
 	operator - -> This { This new(-this x, -this y) }
 	operator + (other: This) -> This { This new(this x + other x, this y + other y) }
@@ -72,14 +74,14 @@ FloatVector2D: cover {
 	basisY: static This { get { This new(0, 1) } }
 
 	polar: static func (radius, azimuth: Float) -> This { This new(radius * cos(azimuth), radius * sin(azimuth)) }
-	parse: static func (input: Text) -> This {
+	parse: static func (input: String) -> This {
 		parts := input split(',')
 		result := This new (parts[0] toFloat(), parts[1] toFloat())
 		parts free()
 		result
 	}
-	linearInterpolation: static func (a, b: This, ratio: Float) -> This {
-		This new(ratio linearInterpolation(a x, b x), ratio linearInterpolation(a y, b y))
+	mix: static func (a, b: This, ratio: Float) -> This {
+		This new(Float mix(a x, b x, ratio), Float mix(a y, b y, ratio))
 	}
 }
 operator * (left: Float, right: FloatVector2D) -> FloatVector2D { FloatVector2D new(left * right x, left * right y) }
@@ -88,5 +90,5 @@ operator * (left: Int, right: FloatVector2D) -> FloatVector2D { FloatVector2D ne
 operator / (left: Int, right: FloatVector2D) -> FloatVector2D { FloatVector2D new(left / right x, left / right y) }
 
 extend Cell<FloatVector2D> {
-	toText: func ~floatvector2d -> Text { (this val as FloatVector2D) toText() }
+	toString: func ~floatvector2d -> String { (this val as FloatVector2D) toString() }
 }

@@ -16,6 +16,18 @@ RasterRgbaTest: class extends Fixture {
 	sourceFlower := "test/draw/input/Flower.png"
 	init: func {
 		super("RasterRgbaTest")
+		this add("color sample", func {
+			colors := RasterRgba open("test/draw/input/Colors.png")
+			expect(colors[0, 0] equals(ColorRgba new(0, 0, 0, 255)))
+			expect(colors[1, 0] equals(ColorRgba new(255, 255, 255, 255)))
+			expect(colors[2, 0] equals(ColorRgba new(255, 0, 0, 255)))
+			expect(colors[3, 0] equals(ColorRgba new(255, 255, 0, 255)))
+			expect(colors[4, 0] equals(ColorRgba new(0, 255, 0, 255)))
+			expect(colors[5, 0] equals(ColorRgba new(0, 255, 255, 255)))
+			expect(colors[6, 0] equals(ColorRgba new(0, 0, 255, 255)))
+			expect(colors[7, 0] equals(ColorRgba new(255, 0, 255, 255)))
+			colors referenceCount decrease()
+		})
 		this add("Test file not found", func {
 			try {
 				image := RasterRgba open("nonExistingFile")
@@ -77,8 +89,7 @@ RasterRgbaTest: class extends Fixture {
 					expect(pixel1 b, is equal to(pixel2 r))
 					expect(pixel1 a, is equal to(pixel2 a))
 				}
-			image referenceCount decrease()
-			image2 referenceCount decrease()
+			(image, image2) referenceCount decrease()
 			output free()
 		})
 	}

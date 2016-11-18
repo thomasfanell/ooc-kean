@@ -6,6 +6,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
+use base
 use concurrent
 use unit
 
@@ -69,6 +70,8 @@ WaitLockTest: class extends Fixture {
 		expect(waitResult, is true)
 		waitingThread cancel()
 		expect(waitingThread wait(1.0), is true)
+		(testThread _code as Closure) free()
+		(waitingThread _code as Closure) free()
 		(testThread, waitingThread, waitLock, globalMutex) free()
 	}
 	_testWakeWithPassingCondition: static func {
@@ -108,6 +111,8 @@ WaitLockTest: class extends Fixture {
 		waitingThread start()
 		expect(testThread wait(1.0), is true)
 		expect(waitingThread alive(), is false)
+		(testThread _code as Closure) free()
+		(waitingThread _code as Closure) free()
 		(testThread, waitingThread, waitLock) free()
 	}
 }

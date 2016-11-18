@@ -18,40 +18,31 @@ CsvWriter: class {
 	init: func (=_fileWriter, delimiter := ',') {
 		this _delimiter = delimiter
 	}
-	free: func {
-		if (this _fileWriter != null) {
-			this _fileWriter close()
+	free: override func {
+		if (this _fileWriter != null)
 			this _fileWriter free()
-		}
 		super()
 	}
-	write: func (row: VectorList<Text>) {
+	write: func (row: VectorList<String>) {
 		for (i in 0 .. row count) {
-			value := TextBuilder new(row[i])
-			for (k in 0 .. row[i] take() count)
-				if (this _isWhitespace(row[i] take()[k])) {
-					value prepend('\"')
-					value append('\"')
+			value := StringBuilder new() . add(row[i] clone())
+			for (k in 0 .. row[i] length())
+				if (row[i][k] whitespace()) {
+					value insert(0, "\"")
+					value add("\"")
 					break
 				}
 			if (i < row count - 1)
-				value append(this _delimiter)
+				value add(this _delimiter)
 			string := value toString()
 			this _fileWriter file write(string)
+			for (i in 0 .. value count)
+				value[i] free()
 			(string, value) free()
 		}
 		this _fileWriter write("\r\n")
 	}
-	_isWhitespace: func (value: Char) -> Bool {
-		value == '\t' || value == ' ' || value == '\r' || value == '\n'
-	}
-	open: static func ~text (filename: Text, delimiter := ',') -> This {
-		filenameString := filename toString()
-		result := This open(filenameString, delimiter)
-		filenameString free()
-		result
-	}
-	open: static func ~string (filename: String, delimiter := ',') -> This {
+	open: static func (filename: String, delimiter := ',') -> This {
 		file := File new(filename)
 		result := This new(FileWriter new(file), delimiter)
 		file free()

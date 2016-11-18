@@ -12,7 +12,7 @@ use draw
 use draw-gpu
 use collections
 use concurrent
-import OpenGLPacked, OpenGLMonochrome, OpenGLRgb, OpenGLRgba, OpenGLUv, OpenGLMesh, OpenGLCanvas, OpenGLPromise
+import OpenGLPacked, OpenGLMonochrome, OpenGLRgb, OpenGLRgba, OpenGLUv, OpenGLMesh, OpenGLPromise, GraphicBufferYuv420Semiplanar, GraphicBuffer
 import OpenGLMap
 import backend/[GLContext, GLRenderer]
 
@@ -24,8 +24,7 @@ _FenceToRasterFuture: class extends ToRasterFuture {
 		this _promise free()
 		super()
 	}
-	wait: override func -> Bool { this _promise wait() }
-	wait: override func ~timeout (time: TimeSpan) -> Bool { this _promise wait(time) }
+	wait: override func (time: TimeSpan) -> Bool { this _promise wait(time) }
 }
 
 OpenGLContext: class extends GpuContext {
@@ -36,11 +35,13 @@ OpenGLContext: class extends GpuContext {
 	_packUvPadded: OpenGLMap
 	_linesShader: OpenGLMap
 	_pointsShader: OpenGLMap
-	_meshShader: OpenGLMapMesh
+	_monochromeToRgba: OpenGLMapTransform
+	_yuvSemiplanarToRgba: OpenGLMapTransform
+	_rgbaToYuva: OpenGLMapTransform
+	_rgbaToUvaa: OpenGLMapTransform
 	_renderer: GLRenderer
 	_recycleBin: RecycleBin<OpenGLPacked>
 	backend ::= this _backend
-	meshShader ::= this _meshShader
 	defaultMap ::= this _transformTextureMap as Map
 	_defaultFontGpu: GpuImage = null
 	defaultFontGpu: GpuImage { get {
@@ -60,8 +61,11 @@ OpenGLContext: class extends GpuContext {
 		this _linesShader = OpenGLMapTransform new(slurp("shaders/color.frag"), this)
 		this _pointsShader = OpenGLMap new(slurp("shaders/points.vert"), slurp("shaders/color.frag"), this)
 		this _transformTextureMap = OpenGLMapTransform new(slurp("shaders/texture.frag"), this)
+		this _monochromeToRgba = OpenGLMapTransform new(slurp("shaders/monochromeToRgba.frag"), this)
+		this _yuvSemiplanarToRgba = OpenGLMapTransform new(slurp("shaders/yuvSemiplanarToRgba.frag"), this)
+		this _rgbaToYuva = OpenGLMapTransform new(slurp("shaders/rgbaToYuva.frag"), this)
+		this _rgbaToUvaa = OpenGLMapTransform new(slurp("shaders/rgbaToUvaa.frag"), this)
 		this _renderer = _backend createRenderer()
-		this _meshShader = OpenGLMapMesh new(this)
 	}
 	init: func ~shared (other: This = null) {
 		if (other != null)
@@ -74,34 +78,23 @@ OpenGLContext: class extends GpuContext {
 		if (this _defaultFontGpu != null)
 			this _defaultFontGpu free()
 		this _backend makeCurrent()
-		this _transformTextureMap free()
-		this _packMonochrome free()
-		this _packUv free()
-		this _packUvPadded free()
-		this _linesShader free()
-		this _pointsShader free()
-		this _meshShader free()
-		this _backend free()
-		this _renderer free()
-		this _recycleBin free()
+		(this _transformTextureMap, this _packMonochrome, this _packUv, this _packUvPadded, this _linesShader) free()
+		(this _monochromeToRgba, this _yuvSemiplanarToRgba, this _rgbaToYuva, this _rgbaToUvaa) free()
+		(this _pointsShader, this _renderer, this _recycleBin, this _backend) free()
 		super()
 	}
-	getMaxContexts: func -> Int { 1 }
-	getCurrentIndex: func -> Int { 0 }
 	drawQuad: func { this _renderer drawQuad() }
 	drawLines: func (pointList: VectorList<FloatPoint2D>, projection: FloatTransform3D, pen: Pen) {
 		positions := pointList pointer as Float*
-		this _linesShader projection = projection
 		this _linesShader add("color", pen color normalized)
-		this _linesShader use(null)
+		this _linesShader useProgram(null, projection, FloatTransform3D identity)
 		this _renderer drawLines(positions, pointList count, 2, pen width)
 	}
 	drawPoints: func (pointList: VectorList<FloatPoint2D>, projection: FloatTransform3D, pen: Pen) {
 		positions := pointList pointer
 		this _pointsShader add("color", pen color normalized)
 		this _pointsShader add("pointSize", pen width)
-		this _pointsShader projection = projection
-		this _pointsShader use(null)
+		this _pointsShader useProgram(null, projection, FloatTransform3D identity)
 		this _renderer drawPoints(positions, pointList count, 2)
 	}
 	recycle: virtual func (image: OpenGLPacked) {
@@ -184,7 +177,7 @@ OpenGLContext: class extends GpuContext {
 				map add("paddingOffset", padding as Float / (target size x * 4))
 			}
 		} else
-			raise("invalid type of GpuImage in packToRgba")
+			Debug error("invalid type of GpuImage in packToRgba")
 		map add("texture0", source)
 		map add("texelOffset", 1.0f / source size x)
 		map add("xOffset", (2.0f / channels - 0.5f) / source size x)
@@ -198,6 +191,38 @@ OpenGLContext: class extends GpuContext {
 			vertices[i] = toGL * vertices[i]
 		OpenGLMesh new(vertices, textureCoordinates, this)
 	}
+	createGrid: override func (size: IntVector2D, vertices: FloatPoint3D[], textureCoordinates: FloatPoint2D[]) -> Mesh {
+		toGL := FloatTransform3D createScaling(1.0f, -1.0f, -1.0f)
+		for (i in 0 .. vertices length)
+			vertices[i] = toGL * vertices[i]
+		triangles := IntPoint3D[2 * size area] new()
+		gridSize := size
+		nodeSize := gridSize + IntVector2D new(1, 1)
+		for (y in 0 .. size y) {
+			for (x in 0 .. size x) {
+				base := y * nodeSize x + x
+				evenTriangle := IntPoint3D new(base, base + 1, base + nodeSize x)
+				oddTriangle := IntPoint3D new(base + 1, base + 1 + nodeSize x, base + nodeSize x)
+				index := 2 * (y * size x + x)
+				triangles[index] = evenTriangle
+				triangles[index + 1] = oddTriangle
+			}
+		}
+		result := OpenGLMesh new(vertices, textureCoordinates, triangles, this)
+		triangles free()
+		result
+	}
 	getDefaultFont: override func -> Image { this defaultFontGpu }
+	getYuvToRgba: override func -> Map { this _yuvSemiplanarToRgba }
+	getRgbaToY: override func -> Map { this _rgbaToYuva }
+	getRgbaToUv: override func -> Map { this _rgbaToUvaa }
+	toRaster: override func ~target (source: GpuImage, target: RasterImage) -> Promise {
+		if (target instanceOf(GraphicBufferYuv420Semiplanar))
+			target as GraphicBufferYuv420Semiplanar buffer lock(GraphicBufferUsage WriteOften)
+		result := super(source, target)
+		if (target instanceOf(GraphicBufferYuv420Semiplanar))
+			target as GraphicBufferYuv420Semiplanar buffer unlock()
+		result
+	}
 }
 }

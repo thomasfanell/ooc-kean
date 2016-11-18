@@ -9,23 +9,23 @@
 use unit
 
 MemoryTest: class extends Fixture {
-	value := 3
+	value: static Int = 3
 	init: func {
 		super("Memory")
 		this add("Global cleanup", func {
 			// Workaround to avoid changing the GlobalCleanup stack saved from other tests
-			saveStack := GlobalCleanup _functionPointers
-			GlobalCleanup _functionPointers = null
+			(savedFunctions, savedPriorities) := (GlobalCleanup _functionPointers, GlobalCleanup _priorities)
+			(GlobalCleanup _functionPointers, GlobalCleanup _priorities) = (null, null)
 
-			GlobalCleanup register(func { this value -= 1 })
+			GlobalCleanup register(This decrease)
 			expect(GlobalCleanup _functionPointers, is notNull)
 
 			GlobalCleanup clear()
 			expect(GlobalCleanup _functionPointers, is Null)
 
-			GlobalCleanup register(func { this value -= 1 })
+			GlobalCleanup register(This decrease)
 			GlobalCleanup register(|| this value -= 1)
-			GlobalCleanup register(func { this value -= 1 })
+			GlobalCleanup register(This decrease)
 			GlobalCleanup run()
 			expect(this value, is equal to(0))
 			expect(GlobalCleanup _functionPointers, is Null)
@@ -34,9 +34,10 @@ MemoryTest: class extends Fixture {
 			expect(GlobalCleanup _functionPointers, is Null)
 
 			// Return the saved stack to GlobalCleanup
-			GlobalCleanup _functionPointers = saveStack
+			(GlobalCleanup _functionPointers, GlobalCleanup _priorities) = (savedFunctions, savedPriorities)
 		})
 	}
+	decrease: static func { This value -= 1 }
 }
 
 MemoryTest new() run() . free()

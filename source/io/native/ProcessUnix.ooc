@@ -6,6 +6,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
+use base
 import ../[Process, Pipe]
 import PipeUnix
 
@@ -44,7 +45,7 @@ ProcessUnix: class extends Process {
 
 		if (status == -1) {
 			errString := strerror(err)
-			Exception new("Process wait(): %s" format(errString toString())) throw()
+			Debug error("Process wait(): %s" format(errString toString()))
 		}
 
 		if (WIFEXITED(status))
@@ -92,9 +93,10 @@ ProcessUnix: class extends Process {
 				dup2(this stdErr as PipeUnix writeFD, 2)
 			}
 
+			envSetFunc := func (key, value: String*) { Env set(key@, value@, true) }
 			if (this env)
-				for (key in this env keys)
-					Env set(key, this env[key], true)
+				this env each(envSetFunc)
+			(envSetFunc as Closure) free()
 
 			if (this cwd != null)
 				chdir(this cwd as CString)

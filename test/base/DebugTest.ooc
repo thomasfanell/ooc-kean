@@ -26,7 +26,7 @@ DebugTest: class extends Fixture {
 			expect(this outputString, is equal to("first"))
 			Debug print("second", DebugLevel Warning)
 			expect(this outputString, is equal to("second"))
-			Debug print(t"third", DebugLevel Everything)
+			Debug print("third", DebugLevel Everything)
 			expect(this outputString, is equal to("third"))
 		})
 		this add("higher level", func {
@@ -38,13 +38,18 @@ DebugTest: class extends Fixture {
 		})
 		this add("test error", func {
 			try {
-				Debug error~text(t"first")
+				Debug error("first")
 				expect(false)
 			}
 			catch (e: Exception) {
 				expect(e, is notNull)
+				e free()
 			}
 		})
+	}
+	free: override func {
+		this outputString free()
+		super()
 	}
 }
 

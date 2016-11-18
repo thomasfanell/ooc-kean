@@ -55,8 +55,10 @@ FloatVector2DTest: class extends Fixture {
 			expect(result y, is equal to(this vector0 x) within(tolerance))
 		})
 		this add("casting", func {
-			value := t"10.00, 20.00"
-			expect(this vector3 toString(), is equal to(value toString()))
+			value := "10.00, 20.00"
+			string := this vector3 toString()
+			expect(string, is equal to(value))
+			string free()
 			expect(FloatVector2D parse(value) x, is equal to(this vector3 x))
 			expect(FloatVector2D parse(value) y, is equal to(this vector3 y))
 		})
@@ -140,9 +142,9 @@ FloatVector2DTest: class extends Fixture {
 			expect(this vector0 scalarProduct(this vector1), is equal to (230.95f) within(0.01f))
 		})
 		this add("interpolation", func {
-			interpolate1 := FloatVector2D linearInterpolation(this vector0, this vector1, 0.0f)
-			interpolate2 := FloatVector2D linearInterpolation(this vector0, this vector1, 0.5f)
-			interpolate3 := FloatVector2D linearInterpolation(this vector0, this vector1, 1.0f)
+			interpolate1 := FloatVector2D mix(this vector0, this vector1, 0.0f)
+			interpolate2 := FloatVector2D mix(this vector0, this vector1, 0.5f)
+			interpolate3 := FloatVector2D mix(this vector0, this vector1, 1.0f)
 			expect(interpolate1 x, is equal to(this vector0 x) within(tolerance))
 			expect(interpolate1 y, is equal to(this vector0 y) within(tolerance))
 			expect(interpolate2 x, is equal to(17.22f) within(0.01f))
@@ -150,21 +152,16 @@ FloatVector2DTest: class extends Fixture {
 			expect(interpolate3 x, is equal to(this vector1 x) within(tolerance))
 			expect(interpolate3 y, is equal to(this vector1 y) within(tolerance))
 		})
-		this add("area, length, hasZeroArea", func {
+		this add("area, norm, hasZeroArea", func {
 			empty := FloatVector2D new()
 			expect(this vector0 area, is equal to(-68.89f) within(0.01f))
-			expect(this vector0 length, is equal to(22.44f) within(0.01f))
+			expect(this vector0 norm, is equal to(22.44f) within(0.01f))
 			expect(empty hasZeroArea, is true)
 			expect(empty area, is equal to(0.0f) within(tolerance))
 			expect(this vector1 hasZeroArea, is false)
 			almostZero := (0.1 + 0.1 + 0.1) - 0.3
 			empty = FloatVector2D new(almostZero, 0.1f)
 			expect(empty hasZeroArea, is true)
-		})
-		this add("toText", func {
-			text := FloatVector2D new(1.0f, 2.0f) toText() take()
-			expect(text, is equal to(t"1.00, 2.00"))
-			text free()
 		})
 		this add("limitLength", func {
 			vector := FloatVector2D new(1.f, 1.f) limitLength(0.75f)

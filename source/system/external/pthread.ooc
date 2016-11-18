@@ -9,7 +9,7 @@
 version (linux) {
 include pthread | (_XOPEN_SOURCE=500, _POSIX_C_SOURCE=200809L)
 
-PTHREAD_MUTEX_RECURSIVE: extern Int
+PTHREAD_MUTEX_RECURSIVE: extern (PTHREAD_MUTEX_RECURSIVE_NP) Int
 
 PThread: cover from pthread_t
 PThreadCond: cover from pthread_cond_t
@@ -23,6 +23,7 @@ pthread_cond_broadcast: extern func (cond: PThreadCond*) -> Int
 pthread_cond_wait: extern func (cond: PThreadCond*, mutex: PThreadMutex*) -> Int
 pthread_cond_destroy: extern func (cond: PThreadCond*) -> Int
 
+pthread_mutex_timedlock: extern func (PThreadMutex*, TimeSpec*) -> Int
 pthread_mutex_lock: extern func (PThreadMutex*)
 pthread_mutex_unlock: extern func (PThreadMutex*)
 pthread_mutex_init: extern func (PThreadMutex*, PThreadMutexAttr*)

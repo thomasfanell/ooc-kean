@@ -15,29 +15,84 @@ _PromiseState: enum {
 	Cancelled
 }
 
-Promise: abstract class {
-	_state: _PromiseState
+_Synchronizer: abstract class {
+	_stateMutex := Mutex new()
 	init: func
-	wait: abstract func -> Bool
-	wait: abstract func ~timeout (time: TimeSpan) -> Bool
-	cancel: virtual func -> Bool { false }
-	operator + (other: This) -> PromiseCollector {
-		collector := PromiseCollector new()
-		collector add(this)
-		collector add(other)
-		collector
+	free: override func {
+		this _stateMutex free()
+		super()
 	}
+	wait: abstract func (time: TimeSpan) -> Bool
+	wait: virtual func ~forever -> Bool {
+		version(debugDeadlock) {
+			timeLimit := TimeSpan milliseconds(1000)
+			timer := WallTimer new() . start()
+			result := this wait(timeLimit)
+			if (timer stop() > timeLimit)
+				Debug error("Error! [" + this class name + " stalled for more than " + timeLimit toMilliseconds() + " milliseconds and timed out]")
+			timer free()
+		}
+		else
+			result := this wait(TimeSpan maximumValue)
+		result
+	}
+	wait: static func ~timed (items: VectorList<This>, time := TimeSpan maximumValue) -> Bool {
+		result := true
+		for (i in 0 .. items count)
+			result = result && (time == TimeSpan maximumValue ? items[i] wait() : items[i] wait(time))
+		result
+	}
+	cancel: virtual func -> Bool { false }
+}
+
+Promise: abstract class extends _Synchronizer {
+	init: func { super() }
 	start: static func (action: Func) -> This { _ThreadPromise new(action) }
 	empty: static This { get { _EmptyPromise new() } }
 }
 
+ClosurePromise: class extends Promise {
+	_wait: Func (TimeSpan) -> Bool
+	init: func (=_wait) { super() }
+	free: override func {
+		(this _wait as Closure) free(Owner Receiver)
+		super()
+	}
+	wait: override func (time: TimeSpan) -> Bool { this _wait(time) }
+}
+
+ConditionPromise: class extends Promise {
+	_completed := false
+	_condition := WaitCondition new()
+	_mutex := Mutex new()
+	init: func { super() }
+	free: override func {
+		(this _mutex, this _condition) free()
+		super()
+	}
+	signal: func {
+		this _mutex with(||
+			this _completed = true
+			this _condition broadcast()
+		)
+	}
+	wait: override func (time: TimeSpan) -> Bool { Debug error("Timed wait is not supported for ConditionPromise"); false }
+	wait: override func ~forever -> Bool {
+		this _mutex lock()
+		if (!this _completed)
+			this _condition wait(this _mutex)
+		this _mutex unlock()
+		this _completed
+	}
+}
+
 _EmptyPromise: class extends Promise {
 	init: func { super() }
-	wait: override func -> Bool { true }
-	wait: override func ~timeout (time: TimeSpan) -> Bool { true }
+	wait: override func (time: TimeSpan) -> Bool { true }
 }
 
 _ThreadPromise: class extends Promise {
+	_state: _PromiseState
 	_action: Func
 	_thread: Thread
 	_threadAlive := true
@@ -47,52 +102,60 @@ _ThreadPromise: class extends Promise {
 		this _state = _PromiseState Unfinished
 		this _action = func {
 			task()
+			this _stateMutex lock()
+			freeSelf := false
 			if (this _state != _PromiseState Cancelled)
 				this _state = _PromiseState Finished
 			if (this _freeOnCompletion) {
 				this _threadAlive = false
-				this free()
+				freeSelf = true
 			}
+			this _stateMutex unlock()
+			if (freeSelf)
+				this free()
 		}
 		this _thread = Thread new(this _action)
 		this _thread start()
 	}
 	free: override func {
+		this _stateMutex lock()
 		if (this _threadAlive) {
 			this _freeOnCompletion = true
+			this _stateMutex unlock()
 			this _thread detach()
 		} else {
+			this _stateMutex unlock()
 			this _thread free()
 			(this _action as Closure) free()
 			super()
 		}
 	}
-	wait: override func -> Bool {
-		if (this _threadAlive)
-			if (this _thread wait())
-				this _threadAlive = false
-		this _state == _PromiseState Finished
-	}
-	wait: override func ~timeout (time: TimeSpan) -> Bool {
-		if (this _threadAlive)
-			if (this _thread wait(time toSeconds()))
-				this _threadAlive = false
-		this _state == _PromiseState Finished
+	wait: override func (time: TimeSpan) -> Bool {
+		this _stateMutex lock()
+		if (this _threadAlive) {
+			this _stateMutex unlock()
+			isAlive := time == TimeSpan maximumValue ? !this _thread wait() : !this _thread wait(time toSeconds())
+			this _stateMutex lock()
+			this _threadAlive = isAlive
+		}
+		result := this _state == _PromiseState Finished
+		this _stateMutex unlock()
+		result
 	}
 	cancel: override func -> Bool {
+		this _stateMutex lock()
 		if (this _state == _PromiseState Unfinished) {
 			this _thread cancel()
 			this _state = _PromiseState Cancelled
 		}
-		this _state == _PromiseState Cancelled
+		result := this _state == _PromiseState Cancelled
+		this _stateMutex unlock()
+		result
 	}
 }
 
-Future: abstract class <T> {
-	_state: _PromiseState
-	init: func
-	wait: abstract func -> Bool
-	wait: abstract func ~timeout (time: TimeSpan) -> Bool
+Future: abstract class <T> extends _Synchronizer {
+	init: func { super() }
 	wait: virtual func ~default (defaultValue: T) -> T {
 		status := this wait()
 		status ? this getResult(defaultValue) : defaultValue
@@ -102,14 +165,14 @@ Future: abstract class <T> {
 		status ? this getResult(defaultValue) : defaultValue
 	}
 	getResult: abstract func (defaultValue: T) -> T
-	cancel: virtual func -> Bool { false }
 	start: static func<S> (S: Class, action: Func -> S) -> This<S> {
 		_ThreadFuture<S> new(action)
 	}
 }
 
 _ThreadFuture: class <T> extends Future<T> {
-	_result: Object
+	_state: _PromiseState
+	_result: __onheap__ T
 	_action: Func
 	_thread: Thread
 	_threadAlive := true
@@ -119,56 +182,67 @@ _ThreadFuture: class <T> extends Future<T> {
 		this _state = _PromiseState Unfinished
 		this _action = func {
 			temporary := task()
-			if (T inheritsFrom(Object))
-				this _result = temporary
-			else
-				this _result = Cell<T> new(temporary)
+			this _result = temporary
+			this _stateMutex lock()
+			freeSelf := false
 			if (this _state != _PromiseState Cancelled)
 				this _state = _PromiseState Finished
 			if (this _freeOnCompletion) {
 				this _threadAlive = false
-				this free()
+				freeSelf = true
 			}
+			this _stateMutex unlock()
+			if (freeSelf)
+				this free()
 		}
 		this _thread = Thread new(this _action)
 		this _thread start()
 	}
 	free: override func {
+		this _stateMutex lock()
 		if (this _threadAlive) {
 			this _freeOnCompletion = true
+			this _stateMutex unlock()
 			this _thread detach()
 		} else {
+			this _stateMutex unlock()
+			memfree(this _result)
 			this _thread free()
 			(this _action as Closure) free()
 			super()
 		}
 	}
-	wait: override func -> Bool {
-		if (this _threadAlive)
-			if (this _thread wait())
+	wait: override func (time: TimeSpan) -> Bool {
+		this _stateMutex lock()
+		if (this _threadAlive) {
+			this _stateMutex unlock()
+			if (this _thread wait(time toSeconds())) {
+				this _stateMutex lock()
 				this _threadAlive = false
-		this _state == _PromiseState Finished
-	}
-	wait: override func ~timeout (time: TimeSpan) -> Bool {
-		if (this _threadAlive)
-			if (this _thread wait(time toSeconds()))
-				this _threadAlive = false
-		this _state == _PromiseState Finished
+			}
+			else
+				this _stateMutex lock()
+		}
+		result := this _state == _PromiseState Finished
+		this _stateMutex unlock()
+		result
 	}
 	getResult: override func (defaultValue: T) -> T {
 		result := defaultValue
+		this _stateMutex lock()
 		if (this _state == _PromiseState Finished && this _result != null)
-			if (T inheritsFrom(Object))
-				result = this _result
-			else
-				result = (this _result as Cell<T>) get()
+			result = this _result
+		this _stateMutex unlock()
 		result
 	}
 	cancel: override func -> Bool {
+		this _stateMutex lock()
 		if (this _state == _PromiseState Unfinished) {
 			this _thread cancel()
 			this _state = _PromiseState Cancelled
 		}
-		this _state == _PromiseState Unfinished
+		result := this _state == _PromiseState Unfinished
+		this _stateMutex unlock()
+		result
 	}
 }

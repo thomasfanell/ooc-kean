@@ -62,14 +62,25 @@ FloatComplexTest: class extends Fixture {
 			expect(this complexNumber1 == this complexNumber2, is false)
 		})
 		this add("toString and parse", func {
-			expect(this complexNumber0 toString(), is equal to("2.00 +1.00i"))
-			expect((FloatComplex parse(t"2.00 +1.00i")) == this complexNumber0, is true)
-			expect(this complexNumber3 toString(), is equal to("-2.00 -1.00i"))
-			expect((FloatComplex parse(t"-2.00 -1.00i")) == this complexNumber3, is true)
-			expect(FloatComplex new (2, -1) toString(), is equal to("2.00 -1.00i"))
-			expect((FloatComplex parse(t"2.00 -1.00i")) == FloatComplex new (2, -1), is true)
-			expect(FloatComplex new (-2, 1) toString(), is equal to("-2.00 +1.00i"))
-			expect((FloatComplex parse(t"-2.00 +1.00i")) == FloatComplex new (-2, 1), is true)
+			string := this complexNumber0 toString()
+			expect(string, is equal to("2.00 +1.00i"))
+			expect((FloatComplex parse("2.00 +1.00i")) == this complexNumber0, is true)
+
+			string free()
+			string = this complexNumber3 toString()
+			expect(string, is equal to("-2.00 -1.00i"))
+			expect((FloatComplex parse("-2.00 -1.00i")) == this complexNumber3, is true)
+
+			string free()
+			string = FloatComplex new (2, -1) toString()
+			expect(string, is equal to("2.00 -1.00i"))
+			expect((FloatComplex parse("2.00 -1.00i")) == FloatComplex new (2, -1), is true)
+
+			string free()
+			string = FloatComplex new (-2, 1) toString()
+			expect(string, is equal to("-2.00 +1.00i"))
+			expect((FloatComplex parse("-2.00 +1.00i")) == FloatComplex new (-2, 1), is true)
+			string free()
 		})
 		this add("exponential", func {
 			expect(this complexNumber0 exponential() real, is equal to(this complexNumber0 real exp() * this complexNumber0 imaginary cos()) within(tolerance))
@@ -95,12 +106,17 @@ FloatComplexTest: class extends Fixture {
 			expect(FloatComplex rootOfUnity(5, 4) real, is equal to(0.309f) within(0.01f))
 			expect(FloatComplex rootOfUnity(5, 4) imaginary, is equal to(-0.951f) within(0.01f))
 		})
-		this add("toText", func {
+		this add("toString", func {
 			complex := FloatComplex new(10, 5)
-			text := complex toText() take()
-			expect(text, is equal to(t"10.00 +5.00i"))
+			text := complex toString()
+			expect(text, is equal to("10.00 +5.00i"))
 			text free()
 		})
+	}
+
+	free: override func {
+		this complexNumberArray free()
+		super()
 	}
 }
 

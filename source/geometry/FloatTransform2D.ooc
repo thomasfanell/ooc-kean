@@ -12,7 +12,6 @@ import IntVector2D
 import FloatVector2D
 import FloatPoint2D
 import FloatBox2D
-import IntTransform2D
 import FloatEuclidTransform, FloatTransform3D, FloatPoint3D
 
 // The 2D transform is a 3x3 homogeneous coordinate matrix.
@@ -30,15 +29,14 @@ FloatTransform2D: cover {
 	scalingX ::= (this a * this a + this b * this b) sqrt()
 	scalingY ::= (this d * this d + this e * this e) sqrt()
 	rotationZ ::= this b atan2(this a)
-	isProjective ::= this determinant != 0.0f
-	isAffine ::= this c == 0.0f && this f == 0.0f && this i == 1.0f
+	isProjective ::= !this determinant equals(0.0f)
+	isAffine ::= this c equals(0.0f) && this f equals(0.0f) && this i equals(1.0f)
 	isSimilarity ::= this == This create(this translation, this scaling, this rotationZ)
 	isEuclidian ::= this == This create(this translation, this rotationZ)
-	isIdentity ::= (this a == 1.0f && this e == 1.0f && this i == 1.0f) && (this b == 0.0f && this c == 0.0f && this d == 0.0f && this f == 0.0f && this g == 0.0f && this h == 0.0f)
+	isIdentity ::= this a equals(1.0f) && this e equals(1.0f) && this i equals(1.0f) && this b equals(0.0f) && this c equals(0.0f) && this d equals(0.0f) && this f equals(0.0f) && this g equals(0.0f) && this h equals(0.0f)
 	inverse: This { get {
 		determinant := this determinant
-		if (determinant == 0)
-			raise("Determinant is zero in FloatTransform2D inverse()")
+		Debug error(determinant equals(0.0f), "Determinant is zero in FloatTransform2D inverse()")
 		This new(
 			(this e * this i - this h * this f) / determinant,
 			(this h * this c - this b * this i) / determinant,
@@ -71,21 +69,10 @@ FloatTransform2D: cover {
 	skewY: func (angle: Float) -> This { This createSkewingY(angle) * this }
 	reflectX: func -> This { This createReflectionX() * this }
 	reflectY: func -> This { This createReflectionY() * this }
-	toIntTransform2D: func -> IntTransform2D { IntTransform2D new(this a, this b, this c, this d, this e, this f, this g, this h, this i) }
 	toString: func -> String {
 		"%8f" formatFloat(this a) >> ", " & "%8f" formatFloat(this b) >> ", " & "%8f" formatFloat(this c) >> "\t" & \
 		"%8f" formatFloat(this d) >> ", " & "%8f" formatFloat(this e) >> ", " & "%8f" formatFloat(this f) >> "\t" & \
 		"%8f" formatFloat(this g) >> ", " & "%8f" formatFloat(this h) >> ", " & "%8f" formatFloat(this i) >> "\t"
-	}
-	toText: func -> Text {
-		result: Text
-		textBuilder := TextBuilder new()
-		textBuilder append(this a toText() + t", " + this b toText() + t", " + this c toText())
-		textBuilder append(this d toText() + t", " + this e toText() + t", " + this f toText())
-		textBuilder append(this g toText() + t", " + this h toText() + t", " + this i toText())
-		result = textBuilder join(t"\t")
-		textBuilder free()
-		result
 	}
 
 	operator * (other: This) -> This {
@@ -125,6 +112,10 @@ FloatTransform2D: cover {
 	operator * (other: FloatBox2D) -> FloatBox2D {
 		FloatBox2D new(this * other leftTop, this * other rightBottom)
 	}
+	operator * (other: FloatTransform3D) -> FloatTransform3D {
+		thisTransform3D := FloatTransform3D new(this)
+		thisTransform3D * other
+	}
 	operator / (value: Float) -> This {
 		This new(
 			this a / value,
@@ -141,7 +132,7 @@ FloatTransform2D: cover {
 	operator [] (x, y: Int) -> Float {
 		result := 0.0f
 		version (safe)
-			raise(x < 0 || x > 2 || y < 0 || y > 2, "Out of bounds in FloatTransform2D get operator (#{x}, #{y})")
+			Debug error(x < 0 || x > 2 || y < 0 || y > 2, "Out of bounds in FloatTransform2D get operator (#{x}, #{y})")
 		match (x) {
 			case 0 =>
 				match (y) {
@@ -202,5 +193,5 @@ FloatTransform2D: cover {
 }
 
 extend Cell<FloatTransform2D> {
-	toText: func ~floattransform2d -> Text { (this val as FloatTransform2D) toText() }
+	toString: func ~floattransform2d -> String { (this val as FloatTransform2D) toString() }
 }
